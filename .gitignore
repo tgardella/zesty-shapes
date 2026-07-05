@@ -1,0 +1,12 @@
+# Claude Code / harness
+.claude/
+
+# Node
+node_modules/
+dist/
+*.log
+.DS_Store
+
+# Env
+.env
+.env.local
