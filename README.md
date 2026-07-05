@@ -17,4 +17,6 @@ npm install
 npm run dev
 ```
 
-_Status: scaffolding in progress._
+_Status: pre-scaffold. The Vite/React/TypeScript project is created by Prompt 0a of the phased
+build plan (see [`docs/PLAN.md`](docs/PLAN.md)); this repo currently holds only the plan and
+README._
