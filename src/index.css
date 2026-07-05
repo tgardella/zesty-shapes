@@ -1,0 +1,158 @@
+:root {
+  font-family: system-ui, sans-serif;
+  font-size: 13px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.app {
+  display: flex;
+  height: 100vh;
+}
+
+/* -- left toolbar -- */
+
+.toolbar {
+  width: 48px;
+  background: #1f2128;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 0;
+  flex-shrink: 0;
+}
+
+.tool-btn {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #aab0c0;
+  cursor: pointer;
+}
+
+.tool-btn:hover {
+  background: #2b2e38;
+  color: #e6e9f2;
+}
+
+.tool-btn.active {
+  background: #3b82f6;
+  color: #ffffff;
+}
+
+/* -- main column -- */
+
+.main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.topbar {
+  height: 40px;
+  background: #26282f;
+  color: #dfe1ea;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0 12px;
+  flex-shrink: 0;
+}
+
+.app-title {
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.zoom-controls {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.zoom-controls button {
+  background: #33363f;
+  color: #dfe1ea;
+  border: none;
+  border-radius: 4px;
+  height: 24px;
+  min-width: 24px;
+  cursor: pointer;
+}
+
+.zoom-controls button:hover {
+  background: #3f434e;
+}
+
+.zoom-label {
+  padding: 0 8px;
+  font-variant-numeric: tabular-nums;
+}
+
+.snap-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #aab0c0;
+  cursor: pointer;
+}
+
+.topbar-spacer {
+  flex: 1;
+}
+
+.export-btn {
+  background: #3b82f6;
+  color: #ffffff;
+  border: none;
+  border-radius: 4px;
+  height: 26px;
+  padding: 0 12px;
+  cursor: pointer;
+}
+
+.export-btn:hover {
+  background: #2f6fd6;
+}
+
+/* -- canvas -- */
+
+.viewport {
+  position: relative;
+  flex: 1;
+  overflow: hidden;
+  background: #e3e5ec;
+  touch-action: none;
+}
+
+.viewport svg.document-svg,
+.viewport svg.overlay-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.viewport svg.overlay-svg {
+  pointer-events: none;
+}
+
+.artboard {
+  filter: drop-shadow(0 1px 3px rgba(30, 34, 48, 0.18));
+}
