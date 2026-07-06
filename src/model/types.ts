@@ -49,11 +49,10 @@ export interface SolidPaint {
 }
 
 /**
- * RESERVED: gradients ship in a later phase, but the variant exists now so the
- * defs registry, Style, and serializer never need a schema change.
- * Geometry convention (when implemented): linear runs (0,0)->(1,0) and radial is the
- * unit circle at (0.5,0.5) in an objectBoundingBox-like unit space; `transform` maps
- * unit space into the node's local space (emitted as gradientTransform).
+ * Geometry convention: linear runs (0,0)->(1,0) and radial is the unit circle
+ * at (0.5,0.5) in unit space; `transform` maps unit space into the node's
+ * LOCAL space (emitted as gradientTransform with gradientUnits=userSpaceOnUse).
+ * See model/gradientGeometry.ts for the annotator <-> transform math.
  */
 export interface GradientPaint {
   type: 'gradient'
@@ -68,7 +67,7 @@ export type StrokeCap = 'butt' | 'round' | 'square'
 export type StrokeJoin = 'miter' | 'round' | 'bevel'
 export type FillRule = 'nonzero' | 'evenodd'
 
-/** RESERVED for the variable-width stroke tool (Shift+W), later phase. */
+/** Variable-width stroke profile point (Width tool, Shift+W). */
 export interface WidthStop {
   /** 0-1 position along the path length. */
   offset: number
@@ -85,7 +84,11 @@ export interface Style {
   /** Dash array in local units; empty = solid. */
   strokeDash: number[]
   fillRule: FillRule
-  /** RESERVED: variable-width profile; absent/undefined = uniform strokeWidth. */
+  /**
+   * Variable-width profile (offsets along TOTAL path length); absent or empty
+   * = uniform strokeWidth. Rendered as the chunked stroke-width APPROXIMATION
+   * until the offset/boolean engine lands (see model/widthProfile.ts).
+   */
   widthProfile?: WidthStop[]
 }
 

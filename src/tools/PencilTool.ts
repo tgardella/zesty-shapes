@@ -11,7 +11,7 @@ import type { Vec2 } from '../geometry/vec2'
 import { distance, sub } from '../geometry/vec2'
 import type { NodeId } from '../model/types'
 import { createAnchor, createSubPath, fitPointsToSubPath } from '../model/pathOps'
-import { createPathNode, defaultStyle } from '../model/nodes'
+import { cloneStyle, createPathNode } from '../model/nodes'
 import { DragBehavior } from './behaviors/DragBehavior'
 import type { Tool, ToolContext, ToolPointerEvent } from './types'
 
@@ -37,7 +37,7 @@ export class PencilTool implements Tool {
     onStart: (e, ctx) => {
       this.samples = [{ x: 0, y: 0 }]
       this.lastScreen = e.screenPoint
-      const style = defaultStyle()
+      const style = cloneStyle(ctx.style.current())
       style.fill = null
       const node = createPathNode(
         [createSubPath([createAnchor({ x: 0, y: 0 })], false)],

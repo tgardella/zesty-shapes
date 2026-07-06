@@ -14,12 +14,14 @@ import { sub } from '../geometry/vec2'
 import { docToScreen, screenToDoc } from '../store/coords'
 import {
   cmdAddNode,
+  cmdApplyAppearance,
   cmdConvertToPath,
   cmdDeleteAnchors,
   cmdDeleteNodes,
   cmdDuplicateNodes,
   cmdGroupNodes,
   cmdMoveNodesBy,
+  cmdSetStyle,
   cmdSetTransforms,
   cmdUngroupNodes,
   cmdUpdateNode,
@@ -284,6 +286,19 @@ export class ToolManager {
         duplicateNodes: (ids, opts) => cmdDuplicateNodes(store, ids, opts),
         convertToPath: (ids) => cmdConvertToPath(store, ids),
         deleteAnchors: (nodeId, anchorIds) => cmdDeleteAnchors(store, nodeId, anchorIds),
+        setStyle: (ids, label, mutate) => cmdSetStyle(store, ids, label, mutate),
+        applyAppearance: (ids, appearance, label) =>
+          cmdApplyAppearance(store, ids, appearance, label),
+      },
+      style: {
+        target: () => g().ui.styleTarget,
+        setTarget: (target) => g().setStyleTarget(target),
+        current: () => g().ui.currentStyle,
+        setCurrent: (style) => g().setCurrentStyle(style),
+      },
+      widthEdit: {
+        get: () => g().ui.widthEdit,
+        set: (id) => g().setWidthEdit(id),
       },
       pathEdit: {
         get: () => g().ui.pathEdit,

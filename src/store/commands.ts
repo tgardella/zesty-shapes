@@ -216,17 +216,106 @@ export function cmdDuplicateNodes(
   return clones.rootIds
 }
 
+/**
+ * Expand a selection to the nodes whose style should actually change:
+ * groups recurse into their (unlocked, visible) leaf descendants — styling a
+ * group means styling everything in it, like Illustrator.
+ */
+export function stylableLeafIds(
+  nodes: Record<NodeId, SceneNode>,
+  ids: NodeId[],
+  rootId: NodeId,
+): NodeId[] {
+  const out: NodeId[] = []
+  const seen = new Set<NodeId>()
+  const visit = (id: NodeId): void => {
+    if (seen.has(id)) return
+    seen.add(id)
+    const node = nodes[id]
+    if (!node || node.locked || node.hidden || id === rootId) return
+    if (node.type === 'group') {
+      for (const childId of node.children) visit(childId)
+      return
+    }
+    out.push(id)
+  }
+  for (const id of ids) visit(id)
+  return out
+}
+
+/**
+ * Mutate the style of every stylable leaf under `ids` (groups recurse) as one
+ * undoable command. The mutation runs per-node so paint objects are never
+ * shared between nodes.
+ */
 export function cmdSetStyle(
   store: EditorStoreApi,
   ids: NodeId[],
   label: string,
-  mutate: (style: Style) => void,
+  mutate: (style: Style, node: SceneNode) => void,
 ): void {
+  const state = store.getState()
+  const targets = stylableLeafIds(state.document.nodes, ids, state.document.root)
+  if (targets.length === 0) return
+  state.applyCommand(label, (doc) => {
+    for (const id of targets) {
+      const node = doc.nodes[id]
+      if (node) mutate(node.style, node)
+    }
+  })
+}
+
+/** Swap fill and stroke PAINTS (widths/caps stay put), per Illustrator. */
+export function cmdSwapFillStroke(store: EditorStoreApi, ids: NodeId[]): void {
+  cmdSetStyle(store, ids, 'Swap Fill & Stroke', (style) => {
+    const fill = style.fill
+    style.fill = style.stroke
+    style.stroke = fill
+  })
+}
+
+/** Sampled appearance carried by the Eyedropper (deep-cloned on both ends). */
+export interface Appearance {
+  style: Style
+  opacity: number
+  blendMode: SceneNode['blendMode']
+}
+
+export function sampleAppearance(node: SceneNode): Appearance {
+  return JSON.parse(
+    JSON.stringify({ style: node.style, opacity: node.opacity, blendMode: node.blendMode }),
+  ) as Appearance
+}
+
+/** Apply a sampled appearance to every stylable leaf under `ids` (one undo step). */
+export function cmdApplyAppearance(
+  store: EditorStoreApi,
+  ids: NodeId[],
+  appearance: Appearance,
+  label = 'Eyedropper',
+): void {
+  const state = store.getState()
+  const targets = stylableLeafIds(state.document.nodes, ids, state.document.root)
+  if (targets.length === 0) return
+  state.applyCommand(label, (doc) => {
+    for (const id of targets) {
+      const node = doc.nodes[id]
+      if (!node) continue
+      node.style = JSON.parse(JSON.stringify(appearance.style)) as Style
+      node.opacity = appearance.opacity
+      node.blendMode = appearance.blendMode
+    }
+  })
+}
+
+/** Node opacity (the BaseNode field, not paint alpha). Applies to groups as-is. */
+export function cmdSetOpacity(store: EditorStoreApi, ids: NodeId[], opacity: number): void {
   if (ids.length === 0) return
-  store.getState().applyCommand(label, (doc) => {
+  const value = Math.min(1, Math.max(0, opacity))
+  store.getState().applyCommand('Opacity', (doc) => {
     for (const id of ids) {
       const node = doc.nodes[id]
-      if (node) mutate(node.style)
+      if (node && id !== doc.root) node.opacity = value
     }
   })
 }

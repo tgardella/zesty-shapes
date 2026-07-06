@@ -20,6 +20,7 @@ import {
 import { subpathsToPathData } from '../geometry/pathData'
 import { isIdentity, toSvgTransform } from '../geometry/matrix'
 import { toSubPaths } from './nodes'
+import { chunkPathData, hasWidthProfile, widthChunks } from './widthProfile'
 import { localBBoxOfNode, transformBBox, unionBBox, type BBox } from '../geometry/bbox'
 
 // ---------------------------------------------------------------------------
@@ -139,9 +140,43 @@ function nodeToSVG(doc: Document, id: NodeId, reg: DefsRegistry): string {
       `${escapeXml(node.text)}</text>`
     )
   }
+  if (hasWidthProfile(node.style)) return variableWidthToSVG(node, reg)
   const d = subpathsToPathData(toSubPaths(node))
   if (d === '') return ''
   return `<path id="${escapeXml(node.id)}" d="${d}"${commonAttrs(node)}${styleAttrs(node, reg)}/>`
+}
+
+/**
+ * Variable-width stroke APPROXIMATION (mirrors NodeView): the fill as one
+ * path + short stroke chunks at interpolated widths, round caps/joins hiding
+ * the joints. The true filled-outline export lands with the offset/boolean
+ * engine (post Prompt 5).
+ */
+function variableWidthToSVG(
+  node: Exclude<SceneNode, { type: 'group' | 'text' }>,
+  reg: DefsRegistry,
+): string {
+  const subpaths = toSubPaths(node)
+  const chunks = widthChunks(subpaths, node.style)
+  const { style } = node
+  let inner = ''
+  if (style.fill !== null) {
+    const d = subpathsToPathData(subpaths)
+    if (d !== '') {
+      let attrs = paintAttrs('fill', style, reg, node.id)
+      if (style.fillRule === 'evenodd') attrs += ` fill-rule="evenodd"`
+      inner += `<path d="${d}"${attrs} stroke="none"/>`
+    }
+  }
+  if (chunks && chunks.length > 0) {
+    const strokeAttrs = paintAttrs('stroke', style, reg, node.id)
+    const paths = chunks
+      .map((c) => `<path d="${chunkPathData(c)}" stroke-width="${c.width}"/>`)
+      .join('')
+    inner += `<g fill="none"${strokeAttrs} stroke-linecap="round" stroke-linejoin="round">${paths}</g>`
+  }
+  if (inner === '') return ''
+  return `<g id="${escapeXml(node.id)}"${commonAttrs(node)}>${inner}</g>`
 }
 
 /**

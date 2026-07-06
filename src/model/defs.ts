@@ -119,11 +119,22 @@ function gradientToSVG(entry: DefsEntry): string {
   const gradientTransform = isIdentity(paint.transform)
     ? ''
     : ` gradientTransform="${toSvgTransform(paint.transform)}"`
+  // gradientUnits="userSpaceOnUse": unit-space coordinates land in the
+  // element's LOCAL space (the element renders inside its own transform), so
+  // paint.transform maps unit space -> local exactly as the model convention
+  // says. objectBoundingBox would compose with the bbox instead — wrong for
+  // rotated axes, and it would break gradient continuity across the
+  // variable-width stroke chunks.
   if (paint.gradientType === 'linear') {
-    // Unit-space convention: linear runs (0,0) -> (1,0); transform maps to local space.
-    return `<linearGradient id="${id}" x1="0" y1="0" x2="1" y2="0"${gradientTransform}>${stops}</linearGradient>`
+    return (
+      `<linearGradient id="${id}" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="1" y2="0"` +
+      `${gradientTransform}>${stops}</linearGradient>`
+    )
   }
-  return `<radialGradient id="${id}" cx="0.5" cy="0.5" r="0.5"${gradientTransform}>${stops}</radialGradient>`
+  return (
+    `<radialGradient id="${id}" gradientUnits="userSpaceOnUse" cx="0.5" cy="0.5" r="0.5"` +
+    `${gradientTransform}>${stops}</radialGradient>`
+  )
 }
 
 /** The <defs> block, or '' when the registry is empty. */

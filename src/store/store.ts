@@ -18,8 +18,9 @@
 import { createStore, type StoreApi } from 'zustand/vanilla'
 import { useStore } from 'zustand'
 import { applyPatches, produceWithPatches, type Draft } from 'immer'
-import type { Document, NodeId } from '../model/types'
+import type { Document, NodeId, Style } from '../model/types'
 import { createDocument } from '../model/document'
+import { defaultStyle } from '../model/nodes'
 import { loadDocumentFromStorage } from '../model/serialize'
 import type { Vec2 } from '../geometry/vec2'
 import type { BBox } from '../geometry/bbox'
@@ -56,6 +57,9 @@ export interface PenPreview {
   to: Vec2
 }
 
+/** Which paint slot the Appearance panel / Gradient tool edits. */
+export type StyleTarget = 'fill' | 'stroke'
+
 export interface UiState {
   /** Marquee rectangle in DOCUMENT space (overlay converts to screen). */
   marquee: BBox | null
@@ -66,6 +70,12 @@ export interface UiState {
   /** Non-null while a path's anchors are being edited (A/P/N/...). */
   pathEdit: PathEditState | null
   penPreview: PenPreview | null
+  /** Active paint slot for the Appearance panel / Gradient annotator. */
+  styleTarget: StyleTarget
+  /** Appearance for NEW objects; edited by the panel when nothing is selected. */
+  currentStyle: Style
+  /** Node whose width profile the Width tool (Shift+W) is editing. */
+  widthEdit: NodeId | null
 }
 
 export interface EditorState {
@@ -130,6 +140,11 @@ export interface EditorActions {
   /** Set/clear the path-edit target; never undoable (like selection). */
   setPathEdit(pe: PathEditState | null): void
   setPenPreview(preview: PenPreview | null): void
+
+  /** Appearance UI state; never undoable. */
+  setStyleTarget(target: StyleTarget): void
+  setCurrentStyle(style: Style): void
+  setWidthEdit(id: NodeId | null): void
 }
 
 export type EditorStore = EditorState & EditorActions
@@ -165,6 +180,9 @@ export function createEditorStore(initialDocument?: Document): EditorStoreApi {
         gridSize: 10,
         pathEdit: null,
         penPreview: null,
+        styleTarget: 'fill',
+        currentStyle: defaultStyle(),
+        widthEdit: null,
       },
       history: emptyHistory(),
 
@@ -346,6 +364,18 @@ export function createEditorStore(initialDocument?: Document): EditorStoreApi {
         const ui = get().ui
         if (ui.snapToGrid !== on) set({ ui: { ...ui, snapToGrid: on } })
       },
+
+      setStyleTarget(target) {
+        const ui = get().ui
+        if (ui.styleTarget !== target) set({ ui: { ...ui, styleTarget: target } })
+      },
+      setCurrentStyle(style) {
+        set({ ui: { ...get().ui, currentStyle: style } })
+      },
+      setWidthEdit(id) {
+        const ui = get().ui
+        if (ui.widthEdit !== id) set({ ui: { ...ui, widthEdit: id } })
+      },
     }
   })
 }
@@ -358,4 +388,14 @@ export const editorStore: EditorStoreApi = createEditorStore(
 /** React binding for the app-wide store. */
 export function useEditor<T>(selector: (s: EditorStore) => T): T {
   return useStore(editorStore, selector)
+}
+
+declare global {
+  interface Window {
+    /** Dev-only handle for debugging and QA scripting. */
+    __editorStore?: EditorStoreApi
+  }
+}
+if (typeof window !== 'undefined' && import.meta.env.DEV) {
+  window.__editorStore = editorStore
 }

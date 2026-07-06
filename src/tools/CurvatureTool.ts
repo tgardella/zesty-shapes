@@ -9,7 +9,7 @@
 import { applyToPoint, translate } from '../geometry/matrix'
 import type { AnchorId, NodeId } from '../model/types'
 import { autoSmoothSubPath, createAnchor, createSubPath } from '../model/pathOps'
-import { createPathNode, defaultStyle } from '../model/nodes'
+import { cloneStyle, createPathNode } from '../model/nodes'
 import { worldTransform } from '../store/worldTransform'
 import { DragBehavior } from './behaviors/DragBehavior'
 import { leafNodeIdFromTarget } from './hitTest'
@@ -124,7 +124,7 @@ export class CurvatureTool implements Tool {
     }
 
     // Empty canvas: start a new curve.
-    const style = defaultStyle()
+    const style = cloneStyle(ctx.style.current())
     style.fill = null
     const anchor = createAnchor({ x: 0, y: 0 }, { type: 'smooth' })
     const node = createPathNode([createSubPath([anchor], false)], {
