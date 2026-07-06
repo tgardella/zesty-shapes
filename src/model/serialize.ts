@@ -20,7 +20,9 @@ import {
 import { subpathsToPathData } from '../geometry/pathData'
 import { isIdentity, toSvgTransform } from '../geometry/matrix'
 import { toSubPaths } from './nodes'
-import { chunkPathData, hasWidthProfile, widthChunks } from './widthProfile'
+import { hasWidthProfile } from './widthProfile'
+import { outlineStroke } from './strokeOutline'
+import { regionsToSubPaths } from './booleanOps'
 import { localBBoxOfNode, transformBBox, unionBBox, type BBox } from '../geometry/bbox'
 
 // ---------------------------------------------------------------------------
@@ -147,17 +149,16 @@ function nodeToSVG(doc: Document, id: NodeId, reg: DefsRegistry): string {
 }
 
 /**
- * Variable-width stroke APPROXIMATION (mirrors NodeView): the fill as one
- * path + short stroke chunks at interpolated widths, round caps/joins hiding
- * the joints. The true filled-outline export lands with the offset/boolean
- * engine (post Prompt 5).
+ * Variable-width strokes export as REAL geometry (mirrors NodeView): the
+ * stroke's filled outline (model/strokeOutline via the boolean engine)
+ * painted with the stroke paint under even-odd, plus the fill as a normal
+ * path underneath.
  */
 function variableWidthToSVG(
   node: Exclude<SceneNode, { type: 'group' | 'text' }>,
   reg: DefsRegistry,
 ): string {
   const subpaths = toSubPaths(node)
-  const chunks = widthChunks(subpaths, node.style)
   const { style } = node
   let inner = ''
   if (style.fill !== null) {
@@ -168,12 +169,21 @@ function variableWidthToSVG(
       inner += `<path d="${d}"${attrs} stroke="none"/>`
     }
   }
-  if (chunks && chunks.length > 0) {
-    const strokeAttrs = paintAttrs('stroke', style, reg, node.id)
-    const paths = chunks
-      .map((c) => `<path d="${chunkPathData(c)}" stroke-width="${c.width}"/>`)
-      .join('')
-    inner += `<g fill="none"${strokeAttrs} stroke-linecap="round" stroke-linejoin="round">${paths}</g>`
+  const outline = outlineStroke(subpaths, style)
+  if (outline) {
+    const d = subpathsToPathData(regionsToSubPaths(outline))
+    if (d !== '') {
+      // The outline is FILLED with the stroke's paint.
+      const paint = style.stroke!
+      let fillAttr: string
+      if (paintNeedsDef(paint)) {
+        fillAttr = ` fill="url(#${acquireDef(reg, paint, node.id)})"`
+      } else {
+        fillAttr = ` fill="${cssColor(paint.color)}"`
+        if (paint.color.a < 1) fillAttr += ` fill-opacity="${paint.color.a}"`
+      }
+      inner += `<path d="${d}"${fillAttr} fill-rule="evenodd" stroke="none"/>`
+    }
   }
   if (inner === '') return ''
   return `<g id="${escapeXml(node.id)}"${commonAttrs(node)}>${inner}</g>`

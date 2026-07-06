@@ -8,12 +8,10 @@
  *  - arc-length sampling of a node's subpaths (local space)
  *  - width interpolation along the profile (linear between stops, clamped
  *    beyond the first/last stop)
- *  - the rendered APPROXIMATION: many short polyline chunks, each stroked at
- *    its interpolated width with round caps/joins.
  *
- * A TRUE outlined variable-width stroke (a filled offset-curve outline) is
- * boolean/offset-engine work and lands after Prompt 5 — this approximation is
- * the deliberate stand-in until then.
+ * The actual RENDERING of a variable-width stroke is the filled outline built
+ * by model/strokeOutline.ts on top of this sampling (via the boolean engine);
+ * NodeView and the SVG exporter both use it.
  */
 
 import type { Vec2 } from '../geometry/vec2'
@@ -36,7 +34,7 @@ export interface PathSample {
 export interface SampledPath {
   samples: PathSample[]
   /** Per-subpath sample index ranges: [start, end) — chunks never cross runs. */
-  runs: Array<{ start: number; end: number }>
+  runs: Array<{ start: number; end: number; closed: boolean }>
   totalLength: number
 }
 
@@ -82,7 +80,7 @@ export function widthAt(profile: WidthStop[], u: number, fallback: number): numb
  */
 export function samplePath(subpaths: SubPath[], stepsPerSegment = FLATTEN_STEPS): SampledPath | null {
   const samples: PathSample[] = []
-  const runs: Array<{ start: number; end: number }> = []
+  const runs: Array<{ start: number; end: number; closed: boolean }> = []
   const lengths: number[] = [] // cumulative length per sample, pre-normalization
 
   let total = 0
@@ -103,7 +101,7 @@ export function samplePath(subpaths: SubPath[], stepsPerSegment = FLATTEN_STEPS)
       }
     }
     if (samples.length - start >= 2) {
-      runs.push({ start, end: samples.length })
+      runs.push({ start, end: samples.length, closed: sp.closed })
     } else {
       // Degenerate subpath (single point): drop its samples.
       samples.length = start
@@ -183,41 +181,6 @@ export function nearestOffsetOnPath(
   return best
 }
 
-/** One stroke chunk of the rendered approximation. */
-export interface WidthChunk {
-  points: Vec2[]
-  width: number
-}
-
-/**
- * The rendered approximation: consecutive sample pairs become 2-point chunks
- * stroked at the width of their midpoint offset. Round caps/joins hide the
- * joints. Returns null when the style has no variable width to render.
- */
-export function widthChunks(subpaths: SubPath[], style: Style): WidthChunk[] | null {
-  if (!hasWidthProfile(style)) return null
-  const sampled = samplePath(subpaths)
-  if (!sampled) return null
-  const profile = sortedProfile(style.widthProfile!)
-  const chunks: WidthChunk[] = []
-  for (const run of sampled.runs) {
-    for (let i = run.start; i < run.end - 1; i++) {
-      const a = sampled.samples[i]!
-      const b = sampled.samples[i + 1]!
-      const w = widthAt(profile, (a.u + b.u) / 2, style.strokeWidth)
-      if (w <= 0) continue
-      chunks.push({ points: [a.point, b.point], width: w })
-    }
-  }
-  return chunks
-}
-
-/** Chunk -> SVG path data ("M x y L x y"). */
-export function chunkPathData(chunk: WidthChunk): string {
-  const n = (v: number) => String(Math.round(v * 1000) / 1000)
-  let d = `M ${n(chunk.points[0]!.x)} ${n(chunk.points[0]!.y)}`
-  for (let i = 1; i < chunk.points.length; i++) {
-    d += ` L ${n(chunk.points[i]!.x)} ${n(chunk.points[i]!.y)}`
-  }
-  return d
-}
+// The Prompt 4 chunked stroke-width approximation (widthChunks) was replaced
+// by the REAL filled outline in model/strokeOutline.ts once the boolean
+// engine landed; rendering and export both go through outlineStroke now.

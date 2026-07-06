@@ -8,8 +8,9 @@ import {
   samplePath,
   sortedProfile,
   widthAt,
-  widthChunks,
 } from './widthProfile'
+import { outlineStroke } from './strokeOutline'
+import { pointInRegions, regionsArea } from '../geometry/boolean'
 
 /** Straight horizontal line 0..100 (easy arc-length assertions). */
 function line(): ReturnType<typeof createSubPath> {
@@ -82,30 +83,55 @@ describe('samplePath / pointAtOffset / nearestOffsetOnPath', () => {
   })
 })
 
-describe('widthChunks (the rendered approximation)', () => {
-  it('emits chunks whose widths follow the profile', () => {
+describe('outlineStroke (the real filled outline)', () => {
+  it('tapered stroke: wide where the profile is wide, thin at the thin end', () => {
     const style = defaultStyle()
     style.widthProfile = [
       { offset: 0, width: 2 },
       { offset: 1, width: 20 },
     ]
-    const chunks = widthChunks([line()], style)!
-    expect(chunks.length).toBeGreaterThan(4)
-    // Monotonically increasing widths along a linear ramp.
-    for (let i = 1; i < chunks.length; i++) {
-      expect(chunks[i]!.width).toBeGreaterThan(chunks[i - 1]!.width)
-    }
-    expect(chunks[0]!.width).toBeGreaterThanOrEqual(2)
-    expect(chunks[chunks.length - 1]!.width).toBeLessThanOrEqual(20)
+    const outline = outlineStroke([line()], style)!
+    expect(outline).not.toBeNull()
+    expect(pointInRegions(outline, { x: 99, y: 8 })).toBe(true) // wide end (±10)
+    expect(pointInRegions(outline, { x: 1, y: 0.5 })).toBe(true) // thin end (±1)
+    expect(pointInRegions(outline, { x: 1, y: 5 })).toBe(false) // beyond the taper
+    // Area ≈ trapezoid: 100 long, widths 2..20 -> ~1100 (+ round caps).
+    const area = regionsArea(outline)
+    expect(area).toBeGreaterThan(1000)
+    expect(area).toBeLessThan(1500)
   })
 
-  it('is null without a stroke or without a profile', () => {
-    const noProfile = defaultStyle()
-    expect(widthChunks([line()], noProfile)).toBeNull()
+  it('outlines a UNIFORM stroke too (the offset primitive)', () => {
+    const style = defaultStyle()
+    style.strokeWidth = 10
+    const outline = outlineStroke([line()], style)!
+    expect(regionsArea(outline)).toBeGreaterThan(990) // 100x10 + round caps
+    expect(pointInRegions(outline, { x: 50, y: 4.9 })).toBe(true)
+    expect(pointInRegions(outline, { x: 50, y: 5.5 })).toBe(false)
+  })
+
+  it('closed subpaths produce an annulus (the hole survives)', () => {
+    const square = createSubPath(
+      [
+        createAnchor({ x: 0, y: 0 }),
+        createAnchor({ x: 100, y: 0 }),
+        createAnchor({ x: 100, y: 100 }),
+        createAnchor({ x: 0, y: 100 }),
+      ],
+      true,
+    )
+    const style = defaultStyle()
+    style.strokeWidth = 8
+    const outline = outlineStroke([square], style)!
+    expect(pointInRegions(outline, { x: 50, y: 2 })).toBe(true) // edge band
+    expect(pointInRegions(outline, { x: 50, y: 50 })).toBe(false) // the hole
+  })
+
+  it('is null without a stroke', () => {
     const noStroke = defaultStyle()
     noStroke.stroke = null
     noStroke.widthProfile = [{ offset: 0.5, width: 5 }]
-    expect(widthChunks([line()], noStroke)).toBeNull()
+    expect(outlineStroke([line()], noStroke)).toBeNull()
     expect(hasWidthProfile(noStroke)).toBe(false)
   })
 })

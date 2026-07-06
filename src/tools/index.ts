@@ -7,8 +7,10 @@ import type { EditorStoreApi } from '../store/store'
 import { CurvatureTool } from './CurvatureTool'
 import { DirectSelectionTool } from './DirectSelectionTool'
 import { EllipseTool } from './EllipseTool'
+import { EraserTool } from './EraserTool'
 import { EyedropperTool } from './EyedropperTool'
 import { GradientTool } from './GradientTool'
+import { KnifeTool } from './KnifeTool'
 import { LineTool } from './LineTool'
 import { PenTool } from './PenTool'
 import { PencilTool } from './PencilTool'
@@ -18,6 +20,7 @@ import { RotateTool } from './RotateTool'
 import { ScaleTool } from './ScaleTool'
 import { ScissorsTool } from './ScissorsTool'
 import { SelectionTool } from './SelectionTool'
+import { ShapeBuilderTool } from './ShapeBuilderTool'
 import { StarTool } from './StarTool'
 import { ToolManager } from './ToolManager'
 import { WidthTool } from './WidthTool'
@@ -41,6 +44,9 @@ export function createToolManager(store: EditorStoreApi): ToolManager {
   manager.register(new EyedropperTool()) //        I
   manager.register(new GradientTool()) //          G
   manager.register(new WidthTool()) //             Shift+W
+  manager.register(new ShapeBuilderTool()) //      Shift+M
+  manager.register(new KnifeTool()) //             toolbar-selected
+  manager.register(new EraserTool()) //            Shift+E
   return manager
 }
 

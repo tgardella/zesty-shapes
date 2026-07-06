@@ -125,6 +125,25 @@ const ICONS: Record<string, ReactNode> = {
       <circle cx="10" cy="10.3" r="1.7" fill="#ffffff" strokeWidth="1.2" />
     </g>
   ),
+  'shape-builder': (
+    <g fill="none" stroke="currentColor" strokeWidth="1.4">
+      <circle cx="8" cy="8" r="5" />
+      <circle cx="12.5" cy="12.5" r="5" />
+      <path d="M8 10.5 L12.5 10.5" strokeWidth="1.2" />
+    </g>
+  ),
+  knife: (
+    <g fill="none" stroke="currentColor" strokeWidth="1.4">
+      <path d="M4 16 C 8 12, 12 8, 16 3" />
+      <path d="M4 16 L9 15 L6.2 12.5 Z" fill="currentColor" />
+    </g>
+  ),
+  eraser: (
+    <g fill="none" stroke="currentColor" strokeWidth="1.4">
+      <rect x="5.5" y="7.5" width="9" height="6" rx="1" transform="rotate(-35 10 10.5)" />
+      <line x1="4" y1="16" x2="13" y2="16" />
+    </g>
+  ),
 }
 
 export function Toolbar({ manager }: { manager: ToolManager }) {

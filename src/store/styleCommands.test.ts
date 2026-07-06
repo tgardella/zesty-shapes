@@ -136,21 +136,20 @@ describe('gradient export through the defs registry', () => {
 })
 
 describe('variable-width export', () => {
-  it('emits the chunked approximation (fill path + per-chunk widths)', () => {
+  it('emits a REAL filled outline (no stroked chunks)', () => {
     const store = createEditorStore()
     const rect = createRectNode({ x: 0, y: 0, w: 100, h: 50 })
+    rect.style.stroke = { type: 'solid', color: RED }
     rect.style.widthProfile = [
       { offset: 0, width: 1 },
       { offset: 1, width: 12 },
     ]
     cmdAddNode(store, rect)
     const svg = documentToSVG(store.getState().document)
-    expect(svg).toContain('stroke-linecap="round"')
-    const widths = [...svg.matchAll(/stroke-width="([\d.]+)"/g)].map((m) => parseFloat(m[1]!))
-    expect(widths.length).toBeGreaterThan(8) // many chunks
-    expect(Math.max(...widths)).toBeGreaterThan(10)
-    expect(Math.min(...widths)).toBeLessThan(2)
-    // The fill still exports as one normal path.
-    expect(svg).toContain('stroke="none"')
+    // The outline is FILLED with the stroke paint under even-odd…
+    expect(svg).toContain('fill="rgb(255,0,0)" fill-rule="evenodd" stroke="none"')
+    // …and no stroked chunks remain anywhere.
+    expect(svg).not.toContain('stroke-width=')
+    expect(svg).not.toContain('stroke-linecap')
   })
 })

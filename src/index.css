@@ -538,6 +538,19 @@ body {
   padding: 2px 4px;
 }
 
+/* -- pathfinder -- */
+
+.pathfinder-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+}
+
+.pf-btn {
+  font-size: 10px;
+  padding: 0 2px;
+}
+
 /* -- layers -- */
 
 .layers-list {

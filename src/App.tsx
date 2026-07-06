@@ -10,6 +10,7 @@ import { initPersistence } from './store/persistence'
 import { createToolManager, type ToolManager } from './tools'
 import { AlignPanel } from './ui/AlignPanel'
 import { AppearancePanel } from './ui/AppearancePanel'
+import { PathfinderPanel } from './ui/PathfinderPanel'
 import { LayersPanel } from './ui/LayersPanel'
 import { Toolbar } from './ui/Toolbar'
 import { TopBar } from './ui/TopBar'
@@ -50,6 +51,7 @@ export function App() {
       <div className="sidebar">
         <AppearancePanel />
         <AlignPanel />
+        <PathfinderPanel />
         <LayersPanel />
       </div>
     </div>

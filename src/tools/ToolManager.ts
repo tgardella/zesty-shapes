@@ -26,6 +26,7 @@ import {
   cmdUngroupNodes,
   cmdUpdateNode,
 } from '../store/commands'
+import { cmdErase, cmdKnife, cmdShapeBuilder } from '../store/booleanCommands'
 import { copySelection, cutSelection, pasteClipboard } from '../store/clipboard'
 import { effectiveScopeId, type EditorStoreApi } from '../store/store'
 import { worldTransform } from '../store/worldTransform'
@@ -133,6 +134,8 @@ export class ToolManager {
     state.setMarquee(null)
     state.setSnapGuides([])
     state.setPenPreview(null)
+    state.setFacePreview(null)
+    state.setCutTrail(null)
     this.down = null
   }
 
@@ -289,6 +292,10 @@ export class ToolManager {
         setStyle: (ids, label, mutate) => cmdSetStyle(store, ids, label, mutate),
         applyAppearance: (ids, appearance, label) =>
           cmdApplyAppearance(store, ids, appearance, label),
+        shapeBuilder: (sourceIds, faces, picked, mode) =>
+          cmdShapeBuilder(store, sourceIds, faces, picked, mode),
+        knife: (trail, ids) => cmdKnife(store, trail, ids),
+        erase: (trail, radius, ids) => cmdErase(store, trail, radius, ids),
       },
       style: {
         target: () => g().ui.styleTarget,
@@ -308,6 +315,8 @@ export class ToolManager {
         setMarquee: (rect) => g().setMarquee(rect),
         setGuides: (guides) => g().setSnapGuides(guides),
         setPenPreview: (preview) => g().setPenPreview(preview),
+        setFacePreview: (region) => g().setFacePreview(region),
+        setCutTrail: (trail) => g().setCutTrail(trail),
       },
       hitTest: {
         topNodeAt: (target) =>
