@@ -5,6 +5,7 @@
  */
 
 import { documentToSVG } from '../model/serialize'
+import { cmdConvertToPath } from '../store/commands'
 import { editorStore, useEditor } from '../store/store'
 
 function viewportCenter(): { x: number; y: number } {
@@ -28,9 +29,14 @@ function exportSvg(): void {
   URL.revokeObjectURL(url)
 }
 
+const CONVERTIBLE = new Set(['rect', 'ellipse', 'polygon', 'star', 'line'])
+
 export function TopBar() {
   const zoom = useEditor((s) => s.viewport.zoom)
   const snapToGrid = useEditor((s) => s.ui.snapToGrid)
+  const canConvert = useEditor((s) =>
+    s.selection.some((id) => CONVERTIBLE.has(s.document.nodes[id]?.type ?? '')),
+  )
 
   const zoomBy = (factor: number) => editorStore.getState().zoomAtPoint(viewportCenter(), factor)
 
@@ -62,6 +68,15 @@ export function TopBar() {
         Snap to grid
       </label>
       <div className="topbar-spacer" />
+      <button
+        type="button"
+        className="to-path-btn"
+        disabled={!canConvert}
+        title="Convert selected shapes to editable paths (transform preserved)"
+        onClick={() => cmdConvertToPath(editorStore, editorStore.getState().selection)}
+      >
+        To Path
+      </button>
       <button type="button" className="export-btn" onClick={exportSvg}>
         Export SVG
       </button>

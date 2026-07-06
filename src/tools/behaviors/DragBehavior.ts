@@ -9,7 +9,8 @@
 import type { ToolContext, ToolPointerEvent } from '../types'
 
 export interface DragHandlers {
-  transactionLabel?: string
+  /** Static label, or a function evaluated when the drag threshold is crossed. */
+  transactionLabel?: string | ((e: ToolPointerEvent) => string)
   onStart?(e: ToolPointerEvent, ctx: ToolContext): void
   onMove?(e: ToolPointerEvent, ctx: ToolContext): void
   onEnd?(e: ToolPointerEvent, ctx: ToolContext): void
@@ -46,7 +47,8 @@ export class DragBehavior {
       const d = e.screenDeltaFromDown
       if (Math.hypot(d.x, d.y) < this.thresholdPx) return
       this.dragging = true
-      if (this.handlers.transactionLabel) ctx.transaction.begin(this.handlers.transactionLabel)
+      const label = this.handlers.transactionLabel
+      if (label) ctx.transaction.begin(typeof label === 'function' ? label(e) : label)
       this.handlers.onStart?.(e, ctx)
     }
     this.handlers.onMove?.(e, ctx)

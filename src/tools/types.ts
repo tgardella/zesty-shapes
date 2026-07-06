@@ -10,6 +10,7 @@ import type { BBox } from '../geometry/bbox'
 import type { Document, NodeId, SceneNode } from '../model/types'
 import type { ViewportState } from '../store/coords'
 import type { AddNodeOptions } from '../store/commands'
+import type { PathEditState, PenPreview } from '../store/store'
 import type { SnapGuide } from '../snapping/types'
 
 export interface ToolModifiers {
@@ -35,8 +36,10 @@ export interface ToolPointerEvent {
   /** Screen-space delta since pointer-down (for drag thresholds). */
   screenDeltaFromDown: Vec2
   modifiers: ToolModifiers
-  /** Topmost hit node, already resolved to a TOP-LEVEL id (child of root). */
+  /** Topmost hit node, resolved to a top-level id within the CURRENT SCOPE. */
   hitNodeId: NodeId | null
+  /** Raw DOM event target, for re-resolving hits after a scope change. */
+  domTarget: EventTarget | null
   buttons: number
 }
 
@@ -57,6 +60,14 @@ export interface ToolContext {
     clear(): void
   }
 
+  /** Group isolation scope (double-click to enter). */
+  scope: {
+    /** Effective scope id — the document root when not isolated. */
+    current(): NodeId
+    /** Enter a group (id) or exit isolation (null). */
+    set(id: NodeId | null): void
+  }
+
   /** One gesture = one transaction = ONE undo step. */
   transaction: {
     begin(label: string): void
@@ -75,19 +86,35 @@ export interface ToolContext {
     deleteNodes(ids: NodeId[]): void
     updateNode(id: NodeId, label: string, mutate: (node: SceneNode) => void): void
     setTransforms(entries: ReadonlyArray<{ id: NodeId; transform: Mat }>, label?: string): void
+    /** Translate by a DOC-space delta, mapped into each node's parent space. */
+    moveNodesBy(ids: NodeId[], docDelta: Vec2, label?: string): void
+    /** Duplicate subtrees in place (above their sources); returns the new root ids. */
+    duplicateNodes(ids: NodeId[], opts?: { offset?: Vec2; label?: string }): NodeId[]
+    /** Shape -> PathNode in place (id/transform preserved); returns converted ids. */
+    convertToPath(ids: NodeId[]): NodeId[]
+    /** Delete anchors (drops degenerate subpaths / empty nodes). */
+    deleteAnchors(nodeId: NodeId, anchorIds: string[]): void
+  }
+
+  /** Path-edit target shown by the overlay (anchors + handles). */
+  pathEdit: {
+    get(): PathEditState | null
+    set(pe: PathEditState | null): void
   }
 
   overlay: {
     /** Marquee rect in DOC space; null hides it. */
     setMarquee(rect: BBox | null): void
     setGuides(guides: SnapGuide[]): void
+    /** Pen rubber-band segment (DOC space); null hides it. */
+    setPenPreview(preview: PenPreview | null): void
   }
 
   hitTest: {
-    /** Resolve a DOM event target to a top-level node id (DOM hit-test). */
+    /** Resolve a DOM event target to a top-level node id within the current scope. */
     topNodeAt(target: EventTarget | null): NodeId | null
-    /** Geometric marquee test; returns top-level ids intersecting the doc rect. */
-    nodesInRect(rect: BBox): NodeId[]
+    /** Geometric marquee test against the current scope's children. */
+    nodesInRect(rect: BBox, mode?: 'intersect' | 'contain'): NodeId[]
   }
 }
 
@@ -103,6 +130,7 @@ export interface Tool {
   onPointerDown?(e: ToolPointerEvent, ctx: ToolContext): void
   onPointerMove?(e: ToolPointerEvent, ctx: ToolContext): void
   onPointerUp?(e: ToolPointerEvent, ctx: ToolContext): void
+  onDoubleClick?(e: ToolPointerEvent, ctx: ToolContext): void
   /** Return true to consume the key (prevents default handling). */
   onKeyDown?(e: KeyboardEvent, ctx: ToolContext): boolean | void
   /** Esc or forced abort: cancel any in-flight gesture/transaction. */

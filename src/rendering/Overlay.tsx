@@ -1,21 +1,31 @@
 /**
  * The SEPARATE screen-space overlay SVG: selection outlines + bounding box
- * with 8 constant-size handles, the marquee, and snap guides. Everything is
- * drawn in SCREEN pixels (doc geometry converted via docToScreen /
- * worldTransform), so handle/outline weights stay constant at any zoom.
+ * with 8 constant-size handles and the rotation knob, the marquee, and snap
+ * guides. Everything is drawn in SCREEN pixels (doc geometry converted via
+ * docToScreen / worldTransform), so handle/outline weights stay constant at
+ * any zoom. Handle GEOMETRY comes from tools/handles.selectionHandleLayout —
+ * the same function the transform gestures hit-test against.
  * pointer-events: none — the viewport container owns all input.
  */
 
+import type { ReactElement } from 'react'
 import type { BBox } from '../geometry/bbox'
-import { localBBoxOfNode, transformBBox, unionBBox } from '../geometry/bbox'
+import { localBBoxOfNode } from '../geometry/bbox'
 import { applyToPoint } from '../geometry/matrix'
 import type { Vec2 } from '../geometry/vec2'
 import { docToScreen } from '../store/coords'
 import { useEditor } from '../store/store'
 import { worldTransform } from '../store/worldTransform'
+import {
+  HANDLE_SIZE_PX,
+  ROTATE_KNOB_RADIUS_PX,
+  rectRadiusHandle,
+  selectionHandleLayout,
+} from '../tools/handles'
 
 const ACCENT = '#3b82f6'
-const HANDLE_SIZE = 8
+/** Corner-radius widget diamond radius (screen px). */
+const RADIUS_DIAMOND_R = 5
 
 export function Overlay() {
   const selection = useEditor((s) => s.selection)
@@ -24,33 +34,25 @@ export function Overlay() {
   const marquee = useEditor((s) => s.ui.marquee)
   const guides = useEditor((s) => s.ui.snapGuides)
 
-  // Per-node outline corners (tight, rotation-aware) + doc-space union bbox.
+  // Per-node outline corners (tight, rotation-aware).
   const outlines: Vec2[][] = []
-  let union: BBox | null = null
   for (const id of selection) {
     const node = nodes[id]
     if (!node) continue
     const local = localBBoxOfNode(node, nodes)
     if (!local) continue
     const world = worldTransform(nodes, id)
-    const corners: Vec2[] = [
-      { x: local.minX, y: local.minY },
-      { x: local.maxX, y: local.minY },
-      { x: local.maxX, y: local.maxY },
-      { x: local.minX, y: local.maxY },
-    ].map((p) => docToScreen(viewport, applyToPoint(world, p)))
-    outlines.push(corners)
-    union = unionBBox(union, transformBBox(world, local))
+    outlines.push(
+      [
+        { x: local.minX, y: local.minY },
+        { x: local.maxX, y: local.minY },
+        { x: local.maxX, y: local.maxY },
+        { x: local.minX, y: local.maxY },
+      ].map((p) => docToScreen(viewport, applyToPoint(world, p))),
+    )
   }
 
-  const box = union
-    ? {
-        x: union.minX * viewport.zoom + viewport.tx,
-        y: union.minY * viewport.zoom + viewport.ty,
-        w: (union.maxX - union.minX) * viewport.zoom,
-        h: (union.maxY - union.minY) * viewport.zoom,
-      }
-    : null
+  const layout = selectionHandleLayout(nodes, selection, viewport)
 
   return (
     <svg className="overlay-svg">
@@ -63,24 +65,41 @@ export function Overlay() {
           strokeWidth={1}
         />
       ))}
-      {box && (
+      {layout && (
         <>
           <rect
-            x={box.x}
-            y={box.y}
-            width={box.w}
-            height={box.h}
+            x={layout.boxScreen.x}
+            y={layout.boxScreen.y}
+            width={layout.boxScreen.w}
+            height={layout.boxScreen.h}
             fill="none"
             stroke={ACCENT}
             strokeWidth={1}
           />
-          {handlePositions(box).map((p, i) => (
+          {/* Rotation affordance: stem + knob (drag rotates; also the R tool). */}
+          <line
+            x1={layout.boxScreen.x + layout.boxScreen.w / 2}
+            y1={layout.boxScreen.y - HANDLE_SIZE_PX / 2}
+            x2={layout.rotationKnobScreen.x}
+            y2={layout.rotationKnobScreen.y + ROTATE_KNOB_RADIUS_PX}
+            stroke={ACCENT}
+            strokeWidth={1}
+          />
+          <circle
+            cx={layout.rotationKnobScreen.x}
+            cy={layout.rotationKnobScreen.y}
+            r={ROTATE_KNOB_RADIUS_PX}
+            fill="#ffffff"
+            stroke={ACCENT}
+            strokeWidth={1}
+          />
+          {layout.handlesScreen.map((p, i) => (
             <rect
               key={i}
-              x={p.x - HANDLE_SIZE / 2}
-              y={p.y - HANDLE_SIZE / 2}
-              width={HANDLE_SIZE}
-              height={HANDLE_SIZE}
+              x={p.x - HANDLE_SIZE_PX / 2}
+              y={p.y - HANDLE_SIZE_PX / 2}
+              width={HANDLE_SIZE_PX}
+              height={HANDLE_SIZE_PX}
               fill="#ffffff"
               stroke={ACCENT}
               strokeWidth={1}
@@ -88,6 +107,9 @@ export function Overlay() {
           ))}
         </>
       )}
+      <RadiusHandleView />
+      <PathEditOverlay />
+      <PenPreviewView />
       {marquee && <MarqueeRect rect={marquee} />}
       {guides.map((g, i) => {
         const a = docToScreen(viewport, g.a)
@@ -109,6 +131,113 @@ export function Overlay() {
   )
 }
 
+/** Live corner-radius widget for a single selected RectNode (diamond marker). */
+function RadiusHandleView() {
+  const nodes = useEditor((s) => s.document.nodes)
+  const selection = useEditor((s) => s.selection)
+  const viewport = useEditor((s) => s.viewport)
+  const handle = rectRadiusHandle(nodes, selection, viewport)
+  if (!handle) return null
+  const { x, y } = handle.screenPoint
+  const r = RADIUS_DIAMOND_R
+  return (
+    <polygon
+      points={`${x},${y - r} ${x + r},${y} ${x},${y + r} ${x - r},${y}`}
+      fill="#ffffff"
+      stroke={ACCENT}
+      strokeWidth={1.2}
+    />
+  )
+}
+
+const ANCHOR_SIZE = 6
+const HANDLE_DOT_R = 2.6
+
+/**
+ * Anchors + bezier handles of the path-edit target (Direct Selection, Pen,
+ * Curvature...). Squares = corner anchors, diamonds = smooth/symmetric; all
+ * constant screen size. Positions go local -> world -> screen, so anchors of
+ * rotated/nested paths land exactly on the visible geometry. Handle lines +
+ * dots are drawn for SELECTED anchors.
+ */
+function PathEditOverlay() {
+  const pathEdit = useEditor((s) => s.ui.pathEdit)
+  const nodes = useEditor((s) => s.document.nodes)
+  const viewport = useEditor((s) => s.viewport)
+  if (!pathEdit) return null
+  const node = nodes[pathEdit.nodeId]
+  if (!node || node.type !== 'path' || node.hidden) return null
+  const world = worldTransform(nodes, node.id)
+  const toScreen = (p: Vec2) => docToScreen(viewport, applyToPoint(world, p))
+  const selected = new Set(pathEdit.anchorIds)
+
+  const anchorSquares: ReactElement[] = []
+  const handleGraphics: ReactElement[] = []
+  for (const sp of node.subpaths) {
+    for (const a of sp.anchors) {
+      const s = toScreen(a.point)
+      const isSel = selected.has(a.id)
+      if (isSel) {
+        for (const end of ['in', 'out'] as const) {
+          const h = end === 'in' ? a.handleIn : a.handleOut
+          if (!h) continue
+          const hs = toScreen(h)
+          handleGraphics.push(
+            <line
+              key={`${a.id}-line-${end}`}
+              x1={s.x}
+              y1={s.y}
+              x2={hs.x}
+              y2={hs.y}
+              stroke={ACCENT}
+              strokeWidth={1}
+            />,
+            <circle key={`${a.id}-dot-${end}`} cx={hs.x} cy={hs.y} r={HANDLE_DOT_R} fill={ACCENT} />,
+          )
+        }
+      }
+      anchorSquares.push(
+        <rect
+          key={a.id}
+          x={s.x - ANCHOR_SIZE / 2}
+          y={s.y - ANCHOR_SIZE / 2}
+          width={ANCHOR_SIZE}
+          height={ANCHOR_SIZE}
+          fill={isSel ? ACCENT : '#ffffff'}
+          stroke={ACCENT}
+          strokeWidth={1}
+          transform={a.type !== 'corner' ? `rotate(45 ${s.x} ${s.y})` : undefined}
+        />,
+      )
+    }
+  }
+  return (
+    <g>
+      {handleGraphics}
+      {anchorSquares}
+    </g>
+  )
+}
+
+/** Pen rubber band: the exact would-be cubic from the last anchor to the cursor. */
+function PenPreviewView() {
+  const preview = useEditor((s) => s.ui.penPreview)
+  const viewport = useEditor((s) => s.viewport)
+  if (!preview) return null
+  const from = docToScreen(viewport, preview.from)
+  const to = docToScreen(viewport, preview.to)
+  const c1 = preview.fromHandle ? docToScreen(viewport, preview.fromHandle) : from
+  return (
+    <path
+      d={`M ${from.x} ${from.y} C ${c1.x} ${c1.y} ${to.x} ${to.y} ${to.x} ${to.y}`}
+      fill="none"
+      stroke={ACCENT}
+      strokeWidth={1}
+      opacity={0.7}
+    />
+  )
+}
+
 function MarqueeRect({ rect }: { rect: BBox }) {
   const viewport = useEditor((s) => s.viewport)
   const a = docToScreen(viewport, { x: rect.minX, y: rect.minY })
@@ -125,18 +254,4 @@ function MarqueeRect({ rect }: { rect: BBox }) {
       strokeDasharray="4 3"
     />
   )
-}
-
-function handlePositions(box: { x: number; y: number; w: number; h: number }): Vec2[] {
-  const { x, y, w, h } = box
-  return [
-    { x, y },
-    { x: x + w / 2, y },
-    { x: x + w, y },
-    { x: x + w, y: y + h / 2 },
-    { x: x + w, y: y + h },
-    { x: x + w / 2, y: y + h },
-    { x, y: y + h },
-    { x, y: y + h / 2 },
-  ]
 }

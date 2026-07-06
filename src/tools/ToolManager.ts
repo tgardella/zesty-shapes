@@ -12,8 +12,20 @@
 import type { Vec2 } from '../geometry/vec2'
 import { sub } from '../geometry/vec2'
 import { docToScreen, screenToDoc } from '../store/coords'
-import { cmdAddNode, cmdDeleteNodes, cmdSetTransforms, cmdUpdateNode } from '../store/commands'
-import type { EditorStoreApi } from '../store/store'
+import {
+  cmdAddNode,
+  cmdConvertToPath,
+  cmdDeleteAnchors,
+  cmdDeleteNodes,
+  cmdDuplicateNodes,
+  cmdGroupNodes,
+  cmdMoveNodesBy,
+  cmdSetTransforms,
+  cmdUngroupNodes,
+  cmdUpdateNode,
+} from '../store/commands'
+import { copySelection, cutSelection, pasteClipboard } from '../store/clipboard'
+import { effectiveScopeId, type EditorStoreApi } from '../store/store'
 import { worldTransform } from '../store/worldTransform'
 import { createDefaultSnapEngine, type SnapEngine } from '../snapping/engine'
 import { nodesInDocRect, topNodeIdFromTarget } from './hitTest'
@@ -105,6 +117,12 @@ export class ToolManager {
     this.cancelGesture()
   }
 
+  /** Double-click (browser-detected); no down/up bookkeeping of its own. */
+  doubleClick(raw: MouseEvent, screenPoint: Vec2): void {
+    const e = this.buildEvent(raw, screenPoint)
+    this.activeTool.onDoubleClick?.(e, this.ctx)
+  }
+
   /** Esc / tool switch / focus loss: abort any in-flight gesture cleanly. */
   cancelGesture(): void {
     this.activeTool.onCancel?.(this.ctx)
@@ -112,6 +130,7 @@ export class ToolManager {
     if (state.inTransaction()) state.cancelTransaction()
     state.setMarquee(null)
     state.setSnapGuides([])
+    state.setPenPreview(null)
     this.down = null
   }
 
@@ -141,9 +160,37 @@ export class ToolManager {
       state.setSpaceHeld(true)
       return true
     }
+    // The active tool gets first crack at editing keys (Delete of selected
+    // anchors, Enter to finish a pen path, mid-drag arrow keys, nudge...).
+    if (this.activeTool.onKeyDown?.(e, this.ctx) === true) return true
     if ((e.key === 'Delete' || e.key === 'Backspace') && !meta) {
       if (state.selection.length > 0) cmdDeleteNodes(this.store, state.selection)
       return true
+    }
+    // Structural / clipboard commands. Never mid-gesture — they would be
+    // swallowed into the open drag transaction's undo step.
+    if (meta && !state.inTransaction()) {
+      if (key === 'g') {
+        if (e.shiftKey) cmdUngroupNodes(this.store, state.selection)
+        else cmdGroupNodes(this.store, state.selection)
+        return true
+      }
+      if (key === 'c') {
+        copySelection(this.store)
+        return true
+      }
+      if (key === 'x') {
+        cutSelection(this.store)
+        return true
+      }
+      if (key === 'v') {
+        pasteClipboard(this.store)
+        return true
+      }
+      if (key === 'd') {
+        cmdDuplicateNodes(this.store, state.selection, { offset: { x: 10, y: 10 } })
+        return true
+      }
     }
     if (!meta && !e.altKey && this.down === null) {
       const shortcut = (e.shiftKey ? 'shift+' : '') + key
@@ -153,7 +200,7 @@ export class ToolManager {
         return true
       }
     }
-    return this.activeTool.onKeyDown?.(e, this.ctx) === true
+    return false
   }
 
   keyUp(e: KeyboardEvent): void {
@@ -162,7 +209,7 @@ export class ToolManager {
 
   // -- event normalization ----------------------------------------------------
 
-  private buildEvent(raw: PointerEvent, screenPoint: Vec2): ToolPointerEvent {
+  private buildEvent(raw: PointerEvent | MouseEvent, screenPoint: Vec2): ToolPointerEvent {
     const state = this.store.getState()
     const viewport = state.viewport
     const docPoint = screenToDoc(viewport, screenPoint)
@@ -190,7 +237,8 @@ export class ToolManager {
       deltaFromDown: anchor ? sub(docPoint, anchor) : ZERO,
       screenDeltaFromDown: this.down ? sub(screenPoint, this.down.screenPoint) : ZERO,
       modifiers,
-      hitNodeId: topNodeIdFromTarget(state.document, raw.target),
+      hitNodeId: topNodeIdFromTarget(state.document, raw.target, effectiveScopeId(state)),
+      domTarget: raw.target,
       buttons: raw.buttons,
     }
   }
@@ -213,6 +261,10 @@ export class ToolManager {
         remove: (ids) => g().removeFromSelection(ids),
         clear: () => g().clearSelection(),
       },
+      scope: {
+        current: () => effectiveScopeId(g()),
+        set: (id) => g().setScope(id),
+      },
       transaction: {
         begin: (label) => g().beginTransaction(label),
         commit: () => g().commitTransaction(),
@@ -228,14 +280,25 @@ export class ToolManager {
         deleteNodes: (ids) => cmdDeleteNodes(store, ids),
         updateNode: (id, label, mutate) => cmdUpdateNode(store, id, label, mutate),
         setTransforms: (entries, label) => cmdSetTransforms(store, entries, label),
+        moveNodesBy: (ids, docDelta, label) => cmdMoveNodesBy(store, ids, docDelta, label),
+        duplicateNodes: (ids, opts) => cmdDuplicateNodes(store, ids, opts),
+        convertToPath: (ids) => cmdConvertToPath(store, ids),
+        deleteAnchors: (nodeId, anchorIds) => cmdDeleteAnchors(store, nodeId, anchorIds),
+      },
+      pathEdit: {
+        get: () => g().ui.pathEdit,
+        set: (pe) => g().setPathEdit(pe),
       },
       overlay: {
         setMarquee: (rect) => g().setMarquee(rect),
         setGuides: (guides) => g().setSnapGuides(guides),
+        setPenPreview: (preview) => g().setPenPreview(preview),
       },
       hitTest: {
-        topNodeAt: (target) => topNodeIdFromTarget(g().document, target),
-        nodesInRect: (rect) => nodesInDocRect(g().document, rect),
+        topNodeAt: (target) =>
+          topNodeIdFromTarget(g().document, target, effectiveScopeId(g())),
+        nodesInRect: (rect, mode) =>
+          nodesInDocRect(g().document, rect, { scopeId: effectiveScopeId(g()), mode }),
       },
     }
   }
