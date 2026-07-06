@@ -10,6 +10,7 @@ import type { BBox } from '../geometry/bbox'
 import type { Document, NodeId, SceneNode, Style } from '../model/types'
 import type { ViewportState } from '../store/coords'
 import type { AddNodeOptions, Appearance } from '../store/commands'
+import type { Face } from '../model/booleanOps'
 import type { PathEditState, PenPreview, StyleTarget } from '../store/store'
 import type { SnapGuide } from '../snapping/types'
 
@@ -98,6 +99,17 @@ export interface ToolContext {
     setStyle(ids: NodeId[], label: string, mutate: (style: Style, node: SceneNode) => void): void
     /** Apply a sampled appearance (Eyedropper) to the leaves under `ids`. */
     applyAppearance(ids: NodeId[], appearance: Appearance, label?: string): void
+    /** Shape Builder apply: merge (or Alt-delete) picked faces; consumes sources. */
+    shapeBuilder(
+      sourceIds: NodeId[],
+      faces: Face[],
+      picked: number[],
+      mode: 'merge' | 'delete',
+    ): NodeId[]
+    /** Freehand knife cut: split intersected targets into separate pieces. */
+    knife(trail: Vec2[], ids?: NodeId[]): NodeId[]
+    /** Freehand eraser: subtract a blob of `radius` from targets. */
+    erase(trail: Vec2[], radius: number, ids?: NodeId[]): NodeId[]
   }
 
   /** Appearance UI state shared with the panel (never undoable). */
@@ -128,6 +140,10 @@ export interface ToolContext {
     setGuides(guides: SnapGuide[]): void
     /** Pen rubber-band segment (DOC space); null hides it. */
     setPenPreview(preview: PenPreview | null): void
+    /** Shape Builder face highlight: one region's rings (DOC space). */
+    setFacePreview(region: Vec2[][] | null): void
+    /** Knife/Eraser freehand trail (DOC space). */
+    setCutTrail(trail: Vec2[] | null): void
   }
 
   hitTest: {

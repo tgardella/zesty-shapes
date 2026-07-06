@@ -9,11 +9,10 @@
  *
  * Gradient paints resolve to url(#id) through the live defs registry (the
  * <Defs> component renders the matching defs in the same commit). Styles with
- * a widthProfile render as the variable-width APPROXIMATION: the fill as one
- * path plus many short stroke chunks at interpolated widths (see
- * model/widthProfile.ts for the deferral story).
+ * a widthProfile render as REAL geometry: the stroke's filled outline through
+ * the boolean engine (model/strokeOutline.ts), matching the exporter.
  *
- * Every element carries data-node-id for the DOM hit-test pipeline (chunked
+ * Every element carries data-node-id for the DOM hit-test pipeline (outlined
  * strokes carry it on their wrapping <g>; `closest()` resolves children).
  */
 
@@ -23,7 +22,9 @@ import { isIdentity, toSvgTransform } from '../geometry/matrix'
 import { subpathsToPathData } from '../geometry/pathData'
 import type { GradientPaint, NodeId, SceneNode } from '../model/types'
 import { toSubPaths } from '../model/nodes'
-import { chunkPathData, hasWidthProfile, widthChunks } from '../model/widthProfile'
+import { regionsToSubPaths } from '../model/booleanOps'
+import { outlineStroke } from '../model/strokeOutline'
+import { hasWidthProfile } from '../model/widthProfile'
 import { liveDefs } from '../store/liveDefs'
 import { editorStore, useEditor } from '../store/store'
 import { svgPaintProps } from './styleAttrs'
@@ -115,10 +116,11 @@ function ShapeView({
 }
 
 /**
- * Variable-width APPROXIMATION: the fill as one normal path (stroke=none) +
- * one short 2-point chunk per flattened sample pair, each stroked at its
- * interpolated width with round caps/joins hiding the joints. Dash patterns
- * do not apply to chunked strokes (deferred with the true outline).
+ * Variable-width strokes render as REAL geometry: the stroke's filled
+ * outline (model/strokeOutline via the boolean engine), painted with the
+ * stroke paint under even-odd, plus the fill as a normal path underneath.
+ * The exporter emits the same construction. Dash patterns do not apply to
+ * outlined strokes (deferred).
  */
 function VariableWidthView({
   node,
@@ -132,7 +134,8 @@ function VariableWidthView({
   style: CSSProperties | undefined
 }) {
   const subpaths = toSubPaths(node)
-  const chunks = widthChunks(subpaths, node.style)
+  const outline = outlineStroke(subpaths, node.style)
+  const outlineD = outline ? subpathsToPathData(regionsToSubPaths(outline)) : ''
   const paint = svgPaintProps(node.style, resolveDefId)
   const fillD = node.style.fill ? subpathsToPathData(subpaths) : ''
   return (
@@ -146,18 +149,14 @@ function VariableWidthView({
           stroke="none"
         />
       )}
-      {chunks && (
-        <g
-          fill="none"
-          stroke={paint.stroke}
-          strokeOpacity={paint.strokeOpacity}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          {chunks.map((chunk, i) => (
-            <path key={i} d={chunkPathData(chunk)} strokeWidth={chunk.width} />
-          ))}
-        </g>
+      {outlineD !== '' && (
+        <path
+          d={outlineD}
+          fill={paint.stroke}
+          fillOpacity={paint.strokeOpacity}
+          fillRule="evenodd"
+          stroke="none"
+        />
       )}
     </g>
   )

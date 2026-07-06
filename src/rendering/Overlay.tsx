@@ -114,6 +114,8 @@ export function Overlay() {
       <PenPreviewView />
       <GradientAnnotatorView />
       <WidthEditOverlay />
+      <FacePreviewView />
+      <CutTrailView />
       {marquee && <MarqueeRect rect={marquee} />}
       {guides.map((g, i) => {
         const a = docToScreen(viewport, g.a)
@@ -326,6 +328,50 @@ function WidthEditOverlay() {
         )
       })}
     </g>
+  )
+}
+
+/**
+ * Shape Builder face highlight: the hovered/gestured atomic region, filled
+ * translucently. Region rings arrive in DOC space; even-odd keeps holes open.
+ */
+function FacePreviewView() {
+  const region = useEditor((s) => s.ui.facePreview)
+  const viewport = useEditor((s) => s.viewport)
+  if (!region) return null
+  let d = ''
+  for (const ring of region) {
+    if (ring.length < 3) continue
+    const pts = ring.map((p) => docToScreen(viewport, p))
+    d += `M ${pts.map((p) => `${p.x} ${p.y}`).join(' L ')} Z `
+  }
+  if (d === '') return null
+  return (
+    <path
+      d={d}
+      fill="rgba(59,130,246,0.25)"
+      fillRule="evenodd"
+      stroke={ACCENT}
+      strokeWidth={1.4}
+    />
+  )
+}
+
+/** Knife/Eraser freehand trail while dragging. */
+function CutTrailView() {
+  const trail = useEditor((s) => s.ui.cutTrail)
+  const viewport = useEditor((s) => s.viewport)
+  if (!trail || trail.length < 2) return null
+  const pts = trail.map((p) => docToScreen(viewport, p))
+  return (
+    <polyline
+      points={pts.map((p) => `${p.x},${p.y}`).join(' ')}
+      fill="none"
+      stroke="#e64545"
+      strokeWidth={1.5}
+      strokeDasharray="5 3"
+      strokeLinecap="round"
+    />
   )
 }
 

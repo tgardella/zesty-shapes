@@ -15,6 +15,7 @@
     "bezier-js": "^6.1.4",
     "immer": "^11.1.11",
     "nanoid": "^5.1.16",
+    "polygon-clipping": "^0.15.7",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "zustand": "^5.0.14"

@@ -76,6 +76,10 @@ export interface UiState {
   currentStyle: Style
   /** Node whose width profile the Width tool (Shift+W) is editing. */
   widthEdit: NodeId | null
+  /** Shape Builder hover/gesture highlight: one region (DOC-space rings). */
+  facePreview: Vec2[][] | null
+  /** Knife/Eraser freehand trail (DOC space) while dragging. */
+  cutTrail: Vec2[] | null
 }
 
 export interface EditorState {
@@ -145,6 +149,10 @@ export interface EditorActions {
   setStyleTarget(target: StyleTarget): void
   setCurrentStyle(style: Style): void
   setWidthEdit(id: NodeId | null): void
+
+  /** Boolean-tool previews (Shape Builder face, Knife/Eraser trail); never undoable. */
+  setFacePreview(region: Vec2[][] | null): void
+  setCutTrail(trail: Vec2[] | null): void
 }
 
 export type EditorStore = EditorState & EditorActions
@@ -183,6 +191,8 @@ export function createEditorStore(initialDocument?: Document): EditorStoreApi {
         styleTarget: 'fill',
         currentStyle: defaultStyle(),
         widthEdit: null,
+        facePreview: null,
+        cutTrail: null,
       },
       history: emptyHistory(),
 
@@ -375,6 +385,16 @@ export function createEditorStore(initialDocument?: Document): EditorStoreApi {
       setWidthEdit(id) {
         const ui = get().ui
         if (ui.widthEdit !== id) set({ ui: { ...ui, widthEdit: id } })
+      },
+      setFacePreview(region) {
+        const ui = get().ui
+        if (ui.facePreview === region || (ui.facePreview === null && region === null)) return
+        set({ ui: { ...ui, facePreview: region } })
+      },
+      setCutTrail(trail) {
+        const ui = get().ui
+        if (ui.cutTrail === trail || (ui.cutTrail === null && trail === null)) return
+        set({ ui: { ...ui, cutTrail: trail } })
       },
     }
   })
