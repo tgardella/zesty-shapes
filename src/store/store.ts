@@ -41,6 +41,21 @@ export interface ToolState {
   spaceHeld: boolean
 }
 
+/** Path-editing target: which PathNode's anchors are shown/selected. */
+export interface PathEditState {
+  nodeId: NodeId
+  /** Selected anchor ids (bare changes are NOT undoable, like selection). */
+  anchorIds: string[]
+}
+
+/** Pen rubber-band: the exact would-be segment from the last anchor (DOC space). */
+export interface PenPreview {
+  from: Vec2
+  /** Outgoing control of the last anchor (null = straight start). */
+  fromHandle: Vec2 | null
+  to: Vec2
+}
+
 export interface UiState {
   /** Marquee rectangle in DOCUMENT space (overlay converts to screen). */
   marquee: BBox | null
@@ -48,15 +63,33 @@ export interface UiState {
   snapGuides: SnapGuide[]
   snapToGrid: boolean
   gridSize: number
+  /** Non-null while a path's anchors are being edited (A/P/N/...). */
+  pathEdit: PathEditState | null
+  penPreview: PenPreview | null
 }
 
 export interface EditorState {
   document: Document
   selection: NodeId[]
+  /**
+   * Group isolation scope ("enter group" via double-click). null = document
+   * root. Hit-testing and marquee resolve against the scope's children.
+   * Validated lazily via effectiveScopeId — a deleted scope falls back to root.
+   */
+  scopeId: NodeId | null
   viewport: ViewportState
   tool: ToolState
   ui: UiState
   history: HistoryState
+}
+
+/** The scope to hit-test against: the stored scope if it still is a live group, else root. */
+export function effectiveScopeId(state: Pick<EditorState, 'document' | 'scopeId'>): NodeId {
+  const { scopeId, document } = state
+  if (scopeId !== null && scopeId !== document.root && document.nodes[scopeId]?.type === 'group') {
+    return scopeId
+  }
+  return document.root
 }
 
 export interface CommandOptions {
@@ -79,6 +112,9 @@ export interface EditorActions {
   removeFromSelection(ids: NodeId[]): void
   clearSelection(): void
 
+  /** Enter (a group id) / exit (null) isolation scope. Never undoable. */
+  setScope(id: NodeId | null): void
+
   setViewport(v: Partial<ViewportState>): void
   panBy(dx: number, dy: number): void
   /** Zoom by `factor`, keeping the doc point under `screenPoint` fixed. */
@@ -90,6 +126,10 @@ export interface EditorActions {
   setMarquee(rect: BBox | null): void
   setSnapGuides(guides: SnapGuide[]): void
   setSnapToGrid(on: boolean): void
+
+  /** Set/clear the path-edit target; never undoable (like selection). */
+  setPathEdit(pe: PathEditState | null): void
+  setPenPreview(preview: PenPreview | null): void
 }
 
 export type EditorStore = EditorState & EditorActions
@@ -115,9 +155,17 @@ export function createEditorStore(initialDocument?: Document): EditorStoreApi {
     return {
       document: initialDocument ?? createDocument(),
       selection: [],
+      scopeId: null,
       viewport: { tx: 60, ty: 60, zoom: 1 },
       tool: { activeToolId: 'selection', spaceHeld: false },
-      ui: { marquee: null, snapGuides: [], snapToGrid: false, gridSize: 10 },
+      ui: {
+        marquee: null,
+        snapGuides: [],
+        snapToGrid: false,
+        gridSize: 10,
+        pathEdit: null,
+        penPreview: null,
+      },
       history: emptyHistory(),
 
       applyCommand(label, recipe, opts) {
@@ -240,6 +288,15 @@ export function createEditorStore(initialDocument?: Document): EditorStoreApi {
         if (get().selection.length > 0) set({ selection: [] })
       },
 
+      setScope(id) {
+        const state = get()
+        const next =
+          id !== null && id !== state.document.root && state.document.nodes[id]?.type === 'group'
+            ? id
+            : null
+        if (state.scopeId !== next) set({ scopeId: next })
+      },
+
       setViewport(v) {
         const cur = get().viewport
         set({ viewport: { ...cur, ...v, zoom: clampZoom(v.zoom ?? cur.zoom) } })
@@ -273,6 +330,18 @@ export function createEditorStore(initialDocument?: Document): EditorStoreApi {
         if (ui.snapGuides === guides || (ui.snapGuides.length === 0 && guides.length === 0)) return
         set({ ui: { ...ui, snapGuides: guides } })
       },
+      setPathEdit(pe) {
+        const ui = get().ui
+        if (ui.pathEdit === pe) return
+        set({ ui: { ...ui, pathEdit: pe } })
+      },
+
+      setPenPreview(preview) {
+        const ui = get().ui
+        if (ui.penPreview === preview || (ui.penPreview === null && preview === null)) return
+        set({ ui: { ...ui, penPreview: preview } })
+      },
+
       setSnapToGrid(on) {
         const ui = get().ui
         if (ui.snapToGrid !== on) set({ ui: { ...ui, snapToGrid: on } })

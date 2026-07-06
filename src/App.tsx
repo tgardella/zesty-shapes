@@ -8,6 +8,8 @@ import { Viewport } from './rendering/Viewport'
 import { editorStore } from './store/store'
 import { initPersistence } from './store/persistence'
 import { createToolManager, type ToolManager } from './tools'
+import { AlignPanel } from './ui/AlignPanel'
+import { LayersPanel } from './ui/LayersPanel'
 import { Toolbar } from './ui/Toolbar'
 import { TopBar } from './ui/TopBar'
 
@@ -43,6 +45,10 @@ export function App() {
       <div className="main">
         <TopBar />
         <Viewport manager={manager} />
+      </div>
+      <div className="sidebar">
+        <AlignPanel />
+        <LayersPanel />
       </div>
     </div>
   )

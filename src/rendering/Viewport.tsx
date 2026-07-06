@@ -113,6 +113,9 @@ export function Viewport({ manager }: { manager: ToolManager }) {
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerCancel}
+      onDoubleClick={(e) => {
+        if (e.button === 0) manager.doubleClick(e.nativeEvent, toScreen(e))
+      }}
       onMouseDown={(e) => {
         if (e.button === 1) e.preventDefault() // block middle-click autoscroll
       }}
