@@ -35,6 +35,11 @@ export function rgba(r: number, g: number, b: number, a = 1): RGBA {
   return { r, g, b, a }
 }
 
+/** Deep copy — paints/profiles are never shared between nodes or UI state. */
+export function cloneStyle(style: Style): Style {
+  return JSON.parse(JSON.stringify(style)) as Style
+}
+
 export function defaultStyle(): Style {
   return {
     fill: { type: 'solid', color: rgba(200, 200, 200, 1) },

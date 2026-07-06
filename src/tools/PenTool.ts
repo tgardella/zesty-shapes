@@ -22,7 +22,7 @@ import {
   removeAnchor,
   reverseSubPath,
 } from '../model/pathOps'
-import { createPathNode, defaultStyle } from '../model/nodes'
+import { cloneStyle, createPathNode } from '../model/nodes'
 import { worldTransform } from '../store/worldTransform'
 import { leafNodeIdFromTarget } from './hitTest'
 import {
@@ -156,7 +156,7 @@ export class PenTool implements Tool {
     }
 
     // Start a NEW path at the snapped point (anchors local, placement in transform).
-    const style = defaultStyle()
+    const style = cloneStyle(ctx.style.current())
     style.fill = null // open stroked path
     const anchor = createAnchor({ x: 0, y: 0 })
     const node = createPathNode([createSubPath([anchor], false)], {

@@ -100,6 +100,31 @@ const ICONS: Record<string, ReactNode> = {
       <path d="M10 1.5 L13 4.5 L10 7.5" fill="none" />
     </g>
   ),
+  eyedropper: (
+    <g fill="none" stroke="currentColor" strokeWidth="1.5">
+      <path d="M4 16 L4.6 13.2 L11 6.8 L13.2 9 L6.8 15.4 Z" strokeLinejoin="round" />
+      <path d="M11.8 6 L14 3.8 A1.55 1.55 0 0 1 16.2 6 L14 8.2" fill="currentColor" />
+    </g>
+  ),
+  gradient: (
+    <g>
+      <defs>
+        <linearGradient id="tool-grad-icon" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stopColor="currentColor" stopOpacity="0.9" />
+          <stop offset="1" stopColor="currentColor" stopOpacity="0.1" />
+        </linearGradient>
+      </defs>
+      <rect x="3.5" y="6" width="13" height="8" fill="url(#tool-grad-icon)" stroke="currentColor" strokeWidth="1.2" />
+    </g>
+  ),
+  width: (
+    <g fill="none" stroke="currentColor">
+      <path d="M3 13 C 7 5, 13 5, 17 13" strokeWidth="1.2" />
+      <path d="M3 13 C 7 9.4, 13 9.4, 17 13" strokeWidth="1.2" />
+      <circle cx="10" cy="7" r="1.7" fill="#ffffff" strokeWidth="1.2" />
+      <circle cx="10" cy="10.3" r="1.7" fill="#ffffff" strokeWidth="1.2" />
+    </g>
+  ),
 }
 
 export function Toolbar({ manager }: { manager: ToolManager }) {

@@ -7,10 +7,10 @@
 import type { Vec2 } from '../geometry/vec2'
 import type { Mat } from '../geometry/matrix'
 import type { BBox } from '../geometry/bbox'
-import type { Document, NodeId, SceneNode } from '../model/types'
+import type { Document, NodeId, SceneNode, Style } from '../model/types'
 import type { ViewportState } from '../store/coords'
-import type { AddNodeOptions } from '../store/commands'
-import type { PathEditState, PenPreview } from '../store/store'
+import type { AddNodeOptions, Appearance } from '../store/commands'
+import type { PathEditState, PenPreview, StyleTarget } from '../store/store'
 import type { SnapGuide } from '../snapping/types'
 
 export interface ToolModifiers {
@@ -94,6 +94,26 @@ export interface ToolContext {
     convertToPath(ids: NodeId[]): NodeId[]
     /** Delete anchors (drops degenerate subpaths / empty nodes). */
     deleteAnchors(nodeId: NodeId, anchorIds: string[]): void
+    /** Mutate styles of the stylable leaves under `ids` (groups recurse). */
+    setStyle(ids: NodeId[], label: string, mutate: (style: Style, node: SceneNode) => void): void
+    /** Apply a sampled appearance (Eyedropper) to the leaves under `ids`. */
+    applyAppearance(ids: NodeId[], appearance: Appearance, label?: string): void
+  }
+
+  /** Appearance UI state shared with the panel (never undoable). */
+  style: {
+    /** Which paint slot (fill/stroke) appearance edits target. */
+    target(): StyleTarget
+    setTarget(target: StyleTarget): void
+    /** Style for NEW objects; tools clone it at creation time. */
+    current(): Style
+    setCurrent(style: Style): void
+  }
+
+  /** Width tool target (overlay shows its width handles). */
+  widthEdit: {
+    get(): NodeId | null
+    set(id: NodeId | null): void
   }
 
   /** Path-edit target shown by the overlay (anchors + handles). */

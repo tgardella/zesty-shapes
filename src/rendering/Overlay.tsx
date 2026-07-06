@@ -22,6 +22,8 @@ import {
   rectRadiusHandle,
   selectionHandleLayout,
 } from '../tools/handles'
+import { gradientAnnotatorLayout } from '../tools/gradientAnnotator'
+import { widthHandleLayout } from '../tools/widthEditShared'
 
 const ACCENT = '#3b82f6'
 /** Corner-radius widget diamond radius (screen px). */
@@ -110,6 +112,8 @@ export function Overlay() {
       <RadiusHandleView />
       <PathEditOverlay />
       <PenPreviewView />
+      <GradientAnnotatorView />
+      <WidthEditOverlay />
       {marquee && <MarqueeRect rect={marquee} />}
       {guides.map((g, i) => {
         const a = docToScreen(viewport, g.a)
@@ -235,6 +239,93 @@ function PenPreviewView() {
       strokeWidth={1}
       opacity={0.7}
     />
+  )
+}
+
+/**
+ * On-canvas gradient annotator (Gradient tool, G): axis line with a square
+ * start handle and round end handle; radial adds the gradient circle. Layout
+ * comes from tools/gradientAnnotator — the SAME function the tool hit-tests
+ * against. Constant screen size at any zoom.
+ */
+function GradientAnnotatorView() {
+  const activeToolId = useEditor((s) => s.tool.activeToolId)
+  const nodes = useEditor((s) => s.document.nodes)
+  const selection = useEditor((s) => s.selection)
+  const target = useEditor((s) => s.ui.styleTarget)
+  const viewport = useEditor((s) => s.viewport)
+  if (activeToolId !== 'gradient') return null
+  const layout = gradientAnnotatorLayout(nodes, selection, target, viewport)
+  if (!layout) return null
+  const { aScreen: a, bScreen: b } = layout
+  return (
+    <g>
+      {layout.circleScreen && (
+        <polygon
+          points={layout.circleScreen.map((p) => `${p.x},${p.y}`).join(' ')}
+          fill="none"
+          stroke={ACCENT}
+          strokeWidth={1}
+          strokeDasharray="4 3"
+          opacity={0.8}
+        />
+      )}
+      <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={ACCENT} strokeWidth={1.4} />
+      <rect
+        x={a.x - 4}
+        y={a.y - 4}
+        width={8}
+        height={8}
+        fill="#ffffff"
+        stroke={ACCENT}
+        strokeWidth={1.2}
+      />
+      <circle cx={b.x} cy={b.y} r={4.5} fill="#ffffff" stroke={ACCENT} strokeWidth={1.2} />
+    </g>
+  )
+}
+
+/**
+ * Width tool handles: for each width stop, a diamond on the path spine and
+ * two dots at the visual half-width extents connected by a rung. Layout from
+ * tools/widthEditShared — the same function the tool hit-tests against.
+ */
+function WidthEditOverlay() {
+  const activeToolId = useEditor((s) => s.tool.activeToolId)
+  const nodes = useEditor((s) => s.document.nodes)
+  const widthEdit = useEditor((s) => s.ui.widthEdit)
+  const viewport = useEditor((s) => s.viewport)
+  if (activeToolId !== 'width') return null
+  const layout = widthHandleLayout(nodes, widthEdit, viewport)
+  if (!layout) return null
+  const r = 4
+  return (
+    <g>
+      {layout.stops.map((stop) => {
+        const s = stop.spineScreen
+        return (
+          <g key={stop.index}>
+            <line
+              x1={stop.dotAScreen.x}
+              y1={stop.dotAScreen.y}
+              x2={stop.dotBScreen.x}
+              y2={stop.dotBScreen.y}
+              stroke={ACCENT}
+              strokeWidth={1}
+              strokeDasharray="3 2"
+            />
+            <circle cx={stop.dotAScreen.x} cy={stop.dotAScreen.y} r={3.4} fill={ACCENT} />
+            <circle cx={stop.dotBScreen.x} cy={stop.dotBScreen.y} r={3.4} fill={ACCENT} />
+            <polygon
+              points={`${s.x},${s.y - r} ${s.x + r},${s.y} ${s.x},${s.y + r} ${s.x - r},${s.y}`}
+              fill="#ffffff"
+              stroke={ACCENT}
+              strokeWidth={1.2}
+            />
+          </g>
+        )
+      })}
+    </g>
   )
 }
 

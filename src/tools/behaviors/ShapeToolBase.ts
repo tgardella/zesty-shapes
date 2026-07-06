@@ -12,6 +12,8 @@
 import type { Vec2 } from '../../geometry/vec2'
 import { angle, distance, length, sub } from '../../geometry/vec2'
 import type { NodeId, SceneNode } from '../../model/types'
+import { cloneStyle } from '../../model/nodes'
+import { fitGradientsToNode } from '../../model/gradientGeometry'
 import { DragBehavior } from './DragBehavior'
 import type { Tool, ToolContext, ToolModifiers, ToolPointerEvent } from '../types'
 
@@ -106,6 +108,7 @@ export abstract class ShapeTool implements Tool {
         transactionLabel: () => `Draw ${this.name}`,
         onStart: (e, ctx) => {
           const node = this.createNode(this.origin)
+          node.style = cloneStyle(ctx.style.current()) // new art wears the current style
           this.draftNodeId = node.id
           ctx.commands.addNode(node)
           this.update(e, ctx)
@@ -115,6 +118,11 @@ export abstract class ShapeTool implements Tool {
           if (this.isDegenerate(this.origin, e.snappedPoint, e.modifiers)) {
             ctx.transaction.cancel() // draft evaporates, no undo entry
           } else if (this.draftNodeId) {
+            // Cloned gradients were sized for another object; refit to the
+            // final geometry (inside the same transaction).
+            ctx.commands.updateNode(this.draftNodeId, `Draw ${this.name}`, (node) =>
+              fitGradientsToNode(node, ctx.getDocument().nodes),
+            )
             ctx.select.set([this.draftNodeId]) // before commit -> restored on redo
           }
           this.reset()

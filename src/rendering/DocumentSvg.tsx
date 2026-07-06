@@ -10,11 +10,13 @@
 import { memo, type ReactNode } from 'react'
 import type { GroupNode } from '../model/types'
 import { useEditor } from '../store/store'
+import { Defs } from './Defs'
 import { NodeView } from './NodeView'
 
 export function DocumentSvg() {
   return (
     <svg className="document-svg">
+      <Defs />
       <PanZoomGroup>
         <Artboards />
         <SceneChildren />

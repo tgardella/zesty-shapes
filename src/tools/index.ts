@@ -7,6 +7,8 @@ import type { EditorStoreApi } from '../store/store'
 import { CurvatureTool } from './CurvatureTool'
 import { DirectSelectionTool } from './DirectSelectionTool'
 import { EllipseTool } from './EllipseTool'
+import { EyedropperTool } from './EyedropperTool'
+import { GradientTool } from './GradientTool'
 import { LineTool } from './LineTool'
 import { PenTool } from './PenTool'
 import { PencilTool } from './PencilTool'
@@ -18,6 +20,7 @@ import { ScissorsTool } from './ScissorsTool'
 import { SelectionTool } from './SelectionTool'
 import { StarTool } from './StarTool'
 import { ToolManager } from './ToolManager'
+import { WidthTool } from './WidthTool'
 
 export function createToolManager(store: EditorStoreApi): ToolManager {
   const manager = new ToolManager(store)
@@ -35,6 +38,9 @@ export function createToolManager(store: EditorStoreApi): ToolManager {
   manager.register(new ScaleTool()) //             S
   manager.register(new RotateTool()) //            R
   manager.register(new ScissorsTool()) //          toolbar-selected
+  manager.register(new EyedropperTool()) //        I
+  manager.register(new GradientTool()) //          G
+  manager.register(new WidthTool()) //             Shift+W
   return manager
 }
 
