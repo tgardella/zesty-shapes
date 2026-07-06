@@ -20,6 +20,7 @@ import {
 import { subpathsToPathData } from '../geometry/pathData'
 import { isIdentity, toSvgTransform } from '../geometry/matrix'
 import { toSubPaths } from './nodes'
+import { layoutText } from './textLayout'
 import { hasWidthProfile } from './widthProfile'
 import { outlineStroke } from './strokeOutline'
 import { regionsToSubPaths } from './booleanOps'
@@ -134,18 +135,39 @@ function nodeToSVG(doc: Document, id: NodeId, reg: DefsRegistry): string {
     const inner = node.children.map((childId) => nodeToSVG(doc, childId, reg)).join('')
     return `<g id="${escapeXml(node.id)}"${commonAttrs(node)}>${inner}</g>`
   }
-  if (node.type === 'text') {
-    // RESERVED: real text layout ships with the Type tool; emit a best-effort element.
-    return (
-      `<text id="${escapeXml(node.id)}"${commonAttrs(node)}${styleAttrs(node, reg)}` +
-      ` font-family="${escapeXml(node.fontFamily)}" font-size="${node.fontSize}">` +
-      `${escapeXml(node.text)}</text>`
-    )
-  }
+  if (node.type === 'text') return textToSVG(node, reg)
   if (hasWidthProfile(node.style)) return variableWidthToSVG(node, reg)
   const d = subpathsToPathData(toSubPaths(node))
   if (d === '') return ''
   return `<path id="${escapeXml(node.id)}" d="${d}"${commonAttrs(node)}${styleAttrs(node, reg)}/>`
+}
+
+/**
+ * Text export mirrors TextView: the SAME layout (model/textLayout via the
+ * registered measurer) emitted as tspans — per-line x-lists for point/area
+ * text, per-glyph tspans (with rotate) for path text and vertical type.
+ */
+function textToSVG(node: Extract<SceneNode, { type: 'text' }>, reg: DefsRegistry): string {
+  const layout = layoutText(node)
+  const round = (v: number): number => Math.round(v * 100) / 100
+  let spans = ''
+  if (layout.mode === 'lines') {
+    for (const line of layout.lines) {
+      spans +=
+        `<tspan x="${line.xs.map(round).join(' ')}" y="${round(line.y)}">` +
+        `${escapeXml(line.text)}</tspan>`
+    }
+  } else {
+    for (const g of layout.glyphs) {
+      const rotate = g.rotate !== undefined ? ` rotate="${Math.round(g.rotate * 10) / 10}"` : ''
+      spans += `<tspan x="${round(g.x)}" y="${round(g.y)}"${rotate}>${escapeXml(g.char)}</tspan>`
+    }
+  }
+  return (
+    `<text id="${escapeXml(node.id)}"${commonAttrs(node)}${styleAttrs(node, reg)}` +
+    ` font-family="${escapeXml(node.fontFamily)}" font-size="${node.fontSize}"` +
+    ` font-weight="${node.fontWeight}" xml:space="preserve">${spans}</text>`
+  )
 }
 
 /**

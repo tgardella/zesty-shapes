@@ -22,6 +22,7 @@ import { DragBehavior } from './behaviors/DragBehavior'
 import { MarqueeBehavior } from './behaviors/MarqueeBehavior'
 import { TransformHandleController } from './behaviors/TransformHandleBehavior'
 import { HANDLE_GRAB_RADIUS_PX, rectRadiusHandle } from './handles'
+import { leafNodeAtPoint, leafNodeIdFromTarget } from './hitTest'
 import type { Tool, ToolContext, ToolPointerEvent } from './types'
 
 const NUDGE_STEP = 1
@@ -212,8 +213,23 @@ export class SelectionTool implements Tool {
     this.drag.up(e, ctx)
   }
 
-  /** Double-click: enter the clicked group / exit isolation on empty canvas. */
+  /**
+   * Double-click: edit a text node in place, enter the clicked group, or
+   * exit isolation on empty canvas.
+   */
   onDoubleClick(e: ToolPointerEvent, ctx: ToolContext): void {
+    // Text wins at any nesting depth (Illustrator: double-click = edit).
+    const leafId =
+      leafNodeIdFromTarget(ctx.getDocument(), e.domTarget) ??
+      leafNodeAtPoint(
+        ctx.getDocument(),
+        e.docPoint,
+        HANDLE_GRAB_RADIUS_PX / ctx.getViewport().zoom,
+      )
+    if (leafId && ctx.getDocument().nodes[leafId]?.type === 'text') {
+      ctx.commands.editTextNode(leafId)
+      return
+    }
     if (e.hitNodeId) {
       const node = ctx.getDocument().nodes[e.hitNodeId]
       if (node?.type === 'group') {

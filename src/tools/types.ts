@@ -110,6 +110,10 @@ export interface ToolContext {
     knife(trail: Vec2[], ids?: NodeId[]): NodeId[]
     /** Freehand eraser: subtract a blob of `radius` from targets. */
     erase(trail: Vec2[], radius: number, ids?: NodeId[]): NodeId[]
+    /** Commit (or roll back, when emptied) the in-place text edit session. */
+    finishTextEdit(): void
+    /** Switch to the Type tool and open the in-place editor on `nodeId`. */
+    editTextNode(nodeId: NodeId): void
   }
 
   /** Appearance UI state shared with the panel (never undoable). */
@@ -128,6 +132,12 @@ export interface ToolContext {
     set(id: NodeId | null): void
   }
 
+  /** In-place text editing target (HTML overlay); never undoable. */
+  textEdit: {
+    get(): { nodeId: NodeId } | null
+    set(edit: { nodeId: NodeId } | null): void
+  }
+
   /** Path-edit target shown by the overlay (anchors + handles). */
   pathEdit: {
     get(): PathEditState | null
@@ -142,6 +152,8 @@ export interface ToolContext {
     setPenPreview(preview: PenPreview | null): void
     /** Shape Builder face highlight: one region's rings (DOC space). */
     setFacePreview(region: Vec2[][] | null): void
+    /** Lasso (Q) freehand trail (DOC space). */
+    setLasso(trail: Vec2[] | null): void
     /** Knife/Eraser freehand trail (DOC space). */
     setCutTrail(trail: Vec2[] | null): void
   }

@@ -11,8 +11,11 @@
 import type { ReactElement } from 'react'
 import type { BBox } from '../geometry/bbox'
 import { localBBoxOfNode } from '../geometry/bbox'
-import { applyToPoint } from '../geometry/matrix'
+import { applyToPoint, compose, type Mat } from '../geometry/matrix'
+import { subpathsToPathData, transformSubPaths } from '../geometry/pathData'
 import type { Vec2 } from '../geometry/vec2'
+import type { NodeId } from '../model/types'
+import { toSubPaths } from '../model/nodes'
 import { docToScreen } from '../store/coords'
 import { useEditor } from '../store/store'
 import { worldTransform } from '../store/worldTransform'
@@ -36,29 +39,45 @@ export function Overlay() {
   const marquee = useEditor((s) => s.ui.marquee)
   const guides = useEditor((s) => s.ui.snapGuides)
 
-  // Per-node outline corners (tight, rotation-aware).
-  const outlines: Vec2[][] = []
-  for (const id of selection) {
+  // Selection highlight: the EXACT geometry of every selected leaf (groups
+  // recurse), transformed local -> world -> screen — not the bounding box.
+  // Text (no outline geometry) falls back to its tight layout-bbox corners.
+  const outlinePaths: string[] = []
+  const textBoxes: Vec2[][] = []
+  const screenMat: Mat = [viewport.zoom, 0, 0, viewport.zoom, viewport.tx, viewport.ty]
+  const collectOutline = (id: NodeId): void => {
     const node = nodes[id]
-    if (!node) continue
-    const local = localBBoxOfNode(node, nodes)
-    if (!local) continue
+    if (!node || node.hidden) return
+    if (node.type === 'group') {
+      for (const child of node.children) collectOutline(child)
+      return
+    }
     const world = worldTransform(nodes, id)
-    outlines.push(
-      [
-        { x: local.minX, y: local.minY },
-        { x: local.maxX, y: local.minY },
-        { x: local.maxX, y: local.maxY },
-        { x: local.minX, y: local.maxY },
-      ].map((p) => docToScreen(viewport, applyToPoint(world, p))),
-    )
+    if (node.type === 'text') {
+      const local = localBBoxOfNode(node, nodes)
+      if (!local) return
+      textBoxes.push(
+        [
+          { x: local.minX, y: local.minY },
+          { x: local.maxX, y: local.minY },
+          { x: local.maxX, y: local.maxY },
+          { x: local.minX, y: local.maxY },
+        ].map((p) => docToScreen(viewport, applyToPoint(world, p))),
+      )
+      return
+    }
+    outlinePaths.push(subpathsToPathData(transformSubPaths(compose(screenMat, world), toSubPaths(node))))
   }
+  for (const id of selection) collectOutline(id)
 
   const layout = selectionHandleLayout(nodes, selection, viewport)
 
   return (
     <svg className="overlay-svg">
-      {outlines.map((corners, i) => (
+      {outlinePaths.map((d, i) => (
+        <path key={i} d={d} fill="none" stroke={ACCENT} strokeWidth={1.4} />
+      ))}
+      {textBoxes.map((corners, i) => (
         <polygon
           key={i}
           points={corners.map((p) => `${p.x},${p.y}`).join(' ')}
@@ -116,6 +135,7 @@ export function Overlay() {
       <WidthEditOverlay />
       <FacePreviewView />
       <CutTrailView />
+      <LassoView />
       {marquee && <MarqueeRect rect={marquee} />}
       {guides.map((g, i) => {
         const a = docToScreen(viewport, g.a)
@@ -353,6 +373,23 @@ function FacePreviewView() {
       fillRule="evenodd"
       stroke={ACCENT}
       strokeWidth={1.4}
+    />
+  )
+}
+
+/** Lasso (Q) freehand region while dragging. */
+function LassoView() {
+  const trail = useEditor((s) => s.ui.lasso)
+  const viewport = useEditor((s) => s.viewport)
+  if (!trail || trail.length < 2) return null
+  const pts = trail.map((p) => docToScreen(viewport, p))
+  return (
+    <polygon
+      points={pts.map((p) => `${p.x},${p.y}`).join(' ')}
+      fill="rgba(59,130,246,0.08)"
+      stroke={ACCENT}
+      strokeWidth={1}
+      strokeDasharray="4 3"
     />
   )
 }

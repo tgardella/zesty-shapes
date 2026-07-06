@@ -144,6 +144,34 @@ const ICONS: Record<string, ReactNode> = {
       <line x1="4" y1="16" x2="13" y2="16" />
     </g>
   ),
+  type: (
+    <g fill="none" stroke="currentColor" strokeWidth="1.6">
+      <path d="M5 5.5 L5 4 L15 4 L15 5.5" />
+      <line x1="10" y1="4" x2="10" y2="16" />
+      <line x1="8" y1="16" x2="12" y2="16" />
+    </g>
+  ),
+  'type-vertical': (
+    <g fill="none" stroke="currentColor" strokeWidth="1.6">
+      <path d="M4.5 6 L4.5 4.5 L11.5 4.5 L11.5 6" />
+      <line x1="8" y1="4.5" x2="8" y2="11" />
+      <path d="M15 4 L15 16 M13 14 L15 16 L17 14" />
+    </g>
+  ),
+  'magic-wand': (
+    <g fill="none" stroke="currentColor" strokeWidth="1.5">
+      <line x1="11.5" y1="8.5" x2="4" y2="16" />
+      <path d="M13.5 3 L14.2 5.3 L16.5 6 L14.2 6.7 L13.5 9 L12.8 6.7 L10.5 6 L12.8 5.3 Z" fill="currentColor" stroke="none" />
+      <line x1="16.5" y1="9.5" x2="17.5" y2="10.5" />
+      <line x1="9.5" y1="2.5" x2="8.5" y2="1.5" />
+    </g>
+  ),
+  lasso: (
+    <g fill="none" stroke="currentColor" strokeWidth="1.5">
+      <path d="M10 3.5 C 14.5 3.5, 17 5.5, 17 8 C 17 10.5, 13.5 12, 10 12 C 6.5 12, 3.5 10.5, 3.5 8 C 3.5 6, 5.5 4.2, 8.5 3.7" />
+      <path d="M7 11.5 C 6 13, 5.5 15, 6.5 17" strokeDasharray="2 1.6" />
+    </g>
+  ),
 }
 
 export function Toolbar({ manager }: { manager: ToolManager }) {

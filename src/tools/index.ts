@@ -11,6 +11,8 @@ import { EraserTool } from './EraserTool'
 import { EyedropperTool } from './EyedropperTool'
 import { GradientTool } from './GradientTool'
 import { KnifeTool } from './KnifeTool'
+import { LassoTool } from './LassoTool'
+import { MagicWandTool } from './MagicWandTool'
 import { LineTool } from './LineTool'
 import { PenTool } from './PenTool'
 import { PencilTool } from './PencilTool'
@@ -23,6 +25,7 @@ import { SelectionTool } from './SelectionTool'
 import { ShapeBuilderTool } from './ShapeBuilderTool'
 import { StarTool } from './StarTool'
 import { ToolManager } from './ToolManager'
+import { TypeTool, VerticalTypeTool } from './TypeTool'
 import { WidthTool } from './WidthTool'
 
 export function createToolManager(store: EditorStoreApi): ToolManager {
@@ -47,6 +50,10 @@ export function createToolManager(store: EditorStoreApi): ToolManager {
   manager.register(new ShapeBuilderTool()) //      Shift+M
   manager.register(new KnifeTool()) //             toolbar-selected
   manager.register(new EraserTool()) //            Shift+E
+  manager.register(new TypeTool()) //              T
+  manager.register(new VerticalTypeTool()) //      toolbar-selected
+  manager.register(new MagicWandTool()) //         Y
+  manager.register(new LassoTool()) //             Q
   return manager
 }
 

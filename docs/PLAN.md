@@ -425,8 +425,10 @@ wand and lasso select correctly.
 - Artboards (Shift+O): create/resize/duplicate/delete multiple artboards on the document-root
   `artboards` array reserved in 0a; per-artboard bounds.
 - Export: SVG (already, model-emitted), PNG + JPG (render document SVG to a canvas via
-  Image+drawImage, toBlob), PDF (svg2pdf.js + jsPDF). Export selection, artboard, or whole
-  document; scale factor options; export multiple assets at once.
+  Image+drawImage, toBlob), PDF (svg2pdf.js + jsPDF). Export selection, artboard, or whole document; scale factor options; export multiple assets at once.
+- Paste or open an existing SVG, PNG, JPG, or PDF file to allow user to edit using the file's underlying elements, attributes, and components as if it were created in this program. 
+- Size or radius selector that adjusts the size of the selected tool (pen, pencil, scissors, knife, brush, etc). mouse pointer renders a transparent circle with light border showing the exact size for the tool
+- Toggle option to display a global grid (lines or dots). Options for inch, cm, or custom. Shapes lock to this grid when toggled on.
 ACCEPTANCE: each format exports a correct file; gradients and text survive PNG/PDF export;
 multi-artboard export produces one asset per artboard.
 ```

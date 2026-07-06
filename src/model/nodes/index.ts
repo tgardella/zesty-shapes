@@ -170,21 +170,48 @@ export function createGroupNode(
   return node
 }
 
-/** RESERVED: Type tool ships later; the factory exists so the variant stays wired. */
-export function createTextNode(
-  params: { text: string; fontFamily?: string; fontSize?: number },
-  overrides: BaseOverrides = {},
-): TextNode {
-  return {
+export interface TextParams {
+  text: string
+  fontFamily?: string
+  fontSize?: number
+  fontWeight?: number
+  textAlign?: TextNode['textAlign']
+  leading?: number
+  kind?: 'point' | 'area'
+  width?: number
+  height?: number
+  tracking?: number
+  kerning?: boolean
+  vertical?: boolean
+  textPath?: SubPath[]
+  pathStartOffset?: number
+}
+
+export function createTextNode(params: TextParams, overrides: BaseOverrides = {}): TextNode {
+  const node: TextNode = {
     ...base('text', 'Text', overrides),
     type: 'text',
     text: params.text,
-    fontFamily: params.fontFamily ?? 'sans-serif',
-    fontSize: params.fontSize ?? 16,
-    fontWeight: 400,
-    textAlign: 'left',
-    leading: 1.2,
+    fontFamily: params.fontFamily ?? 'Inter',
+    fontSize: params.fontSize ?? 24,
+    fontWeight: params.fontWeight ?? 400,
+    textAlign: params.textAlign ?? 'left',
+    leading: params.leading ?? 1.2,
   }
+  if (params.kind) node.kind = params.kind
+  if (params.width !== undefined) node.width = params.width
+  if (params.height !== undefined) node.height = params.height
+  if (params.tracking !== undefined) node.tracking = params.tracking
+  if (params.kerning !== undefined) node.kerning = params.kerning
+  if (params.vertical) node.vertical = true
+  if (params.textPath) node.textPath = params.textPath
+  if (params.pathStartOffset !== undefined) node.pathStartOffset = params.pathStartOffset
+  // Text defaults to a solid dark fill, no stroke (unless a style was given).
+  if (!overrides.style) {
+    node.style.fill = { type: 'solid', color: rgba(20, 20, 20, 1) }
+    node.style.stroke = null
+  }
+  return node
 }
 
 /**

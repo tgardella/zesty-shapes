@@ -12,6 +12,7 @@ import { editorStore, useEditor } from '../store/store'
 import type { ToolManager } from '../tools/ToolManager'
 import { DocumentSvg } from './DocumentSvg'
 import { Overlay } from './Overlay'
+import { TextEditorOverlay } from '../ui/TextEditorOverlay'
 
 interface PanGesture {
   pointerId: number
@@ -123,6 +124,7 @@ export function Viewport({ manager }: { manager: ToolManager }) {
     >
       <DocumentSvg />
       <Overlay />
+      <TextEditorOverlay />
     </div>
   )
 }

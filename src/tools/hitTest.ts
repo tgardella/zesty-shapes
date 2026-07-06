@@ -13,8 +13,13 @@
 
 import type { BBox } from '../geometry/bbox'
 import { bboxesIntersect, localBBoxOfNode, transformBBox } from '../geometry/bbox'
-import { rectIntersectsSubPaths } from '../geometry/hittest'
+import {
+  distanceToSubPaths,
+  pointInSubPaths,
+  rectIntersectsSubPaths,
+} from '../geometry/hittest'
 import { transformSubPaths } from '../geometry/pathData'
+import type { Vec2 } from '../geometry/vec2'
 import type { Document, NodeId, SceneNode } from '../model/types'
 import { toSubPaths } from '../model/nodes'
 import { worldTransform } from '../store/worldTransform'
@@ -90,6 +95,43 @@ export function topNodeIdFromTarget(
 }
 
 /**
+ * GEOMETRIC point hit-test: the topmost selectable leaf whose geometry is
+ * within `tolerance` (doc units) of the point — fills count when the point
+ * is inside, outlines within the tolerance band, text by its layout bbox.
+ * Backstop for the DOM hit-test: DOM hits only painted pixels, so clicking
+ * the edge of an unfilled shape or between the glyphs of a text block
+ * misses; this doesn't.
+ */
+export function leafNodeAtPoint(doc: Document, point: Vec2, tolerance: number): NodeId | null {
+  const visit = (id: NodeId): NodeId | null => {
+    const node = doc.nodes[id]
+    if (!node || node.locked || node.hidden) return null
+    if (node.type === 'group') {
+      // Topmost first: children paint in array order, so scan back-to-front.
+      for (let i = node.children.length - 1; i >= 0; i--) {
+        const hit = visit(node.children[i]!)
+        if (hit) return hit
+      }
+      return null
+    }
+    const world = worldTransform(doc.nodes, id)
+    if (node.type === 'text') {
+      const local = localBBoxOfNode(node, doc.nodes)
+      if (!local) return null
+      const b = transformBBox(world, local)
+      const inX = point.x >= b.minX - tolerance && point.x <= b.maxX + tolerance
+      const inY = point.y >= b.minY - tolerance && point.y <= b.maxY + tolerance
+      return inX && inY ? id : null
+    }
+    const subpaths = transformSubPaths(world, toSubPaths(node))
+    if (node.style.fill && pointInSubPaths(point, subpaths, node.style.fillRule)) return id
+    const band = tolerance + (node.style.stroke ? node.style.strokeWidth / 2 : 0)
+    return distanceToSubPaths(point, subpaths) <= band ? id : null
+  }
+  return visit(doc.root)
+}
+
+/**
  * Children of `scopeId` matched by the doc-space marquee rect.
  * 'intersect': any geometry touches the rect. 'contain': the node's world
  * bbox lies entirely inside the rect.
@@ -116,10 +158,11 @@ function subtreeIntersectsRect(doc: Document, id: NodeId, rect: BBox): boolean {
   if (node.type === 'group') {
     return node.children.some((childId) => subtreeIntersectsRect(doc, childId, rect))
   }
-  if (node.type === 'text') return false // reserved kind, no measurable geometry yet
   const world = worldTransform(doc.nodes, id)
   const local = localBBoxOfNode(node, doc.nodes)
   if (local && !bboxesIntersect(transformBBox(world, local), rect)) return false
+  // Text has no outline geometry to intersect; its (layout) bbox decides.
+  if (node.type === 'text') return local !== null
   return rectIntersectsSubPaths(rect, transformSubPaths(world, toSubPaths(node)), node.style.fillRule)
 }
 
