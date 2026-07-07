@@ -296,6 +296,39 @@ export function Toolbar({ manager }: { manager: ToolManager }) {
     }
   }
 
+  const closeFlyout = (): void => {
+    setFlyout(null)
+    // Never leave the click-suppressor armed once the flyout is gone, or the
+    // next tap on a grouped slot gets eaten.
+    suppressClick.current = false
+  }
+
+  // Dismiss the flyout on any outside pointerdown, Escape, or window blur —
+  // WITHOUT a full-screen backdrop, so the flyout can never blanket the screen
+  // and block the toolbar/panels/canvas. Deferred a tick so the pointer gesture
+  // that opened it (hold-release) doesn't immediately close it.
+  useEffect(() => {
+    if (!flyout) return
+    const onDown = (e: PointerEvent): void => {
+      if (!(e.target as HTMLElement | null)?.closest('.tool-flyout')) closeFlyout()
+    }
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') closeFlyout()
+    }
+    const timer = window.setTimeout(() => {
+      window.addEventListener('pointerdown', onDown, true)
+      window.addEventListener('keydown', onKey)
+      window.addEventListener('blur', closeFlyout)
+    }, 0)
+    return () => {
+      window.clearTimeout(timer)
+      window.removeEventListener('pointerdown', onDown, true)
+      window.removeEventListener('keydown', onKey)
+      window.removeEventListener('blur', closeFlyout)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [flyout])
+
   const openFlyout = (slotKey: string, button: HTMLElement): void => {
     const rect = button.getBoundingClientRect()
     setFlyout({ slotKey, top: rect.top, left: rect.right + 4 })
@@ -304,7 +337,7 @@ export function Toolbar({ manager }: { manager: ToolManager }) {
   const pick = (toolId: string): void => {
     manager.setActiveTool(toolId)
     setGroupCurrent(toolId)
-    setFlyout(null)
+    closeFlyout()
   }
 
   const flyoutSlot = flyout ? slots.find((s) => s.key === flyout.slotKey) : undefined
@@ -359,10 +392,8 @@ export function Toolbar({ manager }: { manager: ToolManager }) {
       })}
 
       {flyout && flyoutSlot && (
-        <>
-          <div className="menu-backdrop" onPointerDown={() => setFlyout(null)} />
-          <div className="tool-flyout" style={{ top: flyout.top, left: flyout.left }}>
-            {flyoutSlot.toolIds.map((id) => {
+        <div className="tool-flyout" style={{ top: flyout.top, left: flyout.left }}>
+          {flyoutSlot.toolIds.map((id) => {
               const tool = byId.get(id)!
               return (
                 <button
@@ -381,8 +412,7 @@ export function Toolbar({ manager }: { manager: ToolManager }) {
                 </button>
               )
             })}
-          </div>
-        </>
+        </div>
       )}
     </div>
   )
