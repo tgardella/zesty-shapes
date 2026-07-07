@@ -12,8 +12,9 @@
 import { invert, applyToPoint } from '../geometry/matrix'
 import type { Vec2 } from '../geometry/vec2'
 import type { NodeId, RGBA } from '../model/types'
+import type { MeshHandleDir } from '../model/mesh'
 import { leafNodeIdFromTarget } from './hitTest'
-import { hitMeshPoint, meshOverlayLayout } from './meshEditShared'
+import { hitMeshHandle, hitMeshPoint, meshHandleLayout, meshOverlayLayout } from './meshEditShared'
 import type { Tool, ToolContext, ToolPointerEvent } from './types'
 
 const DRAG_THRESHOLD_PX = 3
@@ -33,6 +34,9 @@ export class GradientMeshTool implements Tool {
 
   /** Point-drag gesture state (null while idle). */
   private drag: { nodeId: NodeId; pointIndex: number; moved: boolean } | null = null
+  /** Tangent-handle drag gesture state (null while idle). */
+  private handleDrag: { nodeId: NodeId; index: number; dir: MeshHandleDir; moved: boolean } | null =
+    null
 
   private toLocal(ctx: ToolContext, nodeId: NodeId, docPoint: Vec2): Vec2 {
     return applyToPoint(invert(ctx.worldTransform(nodeId)), docPoint)
@@ -41,7 +45,17 @@ export class GradientMeshTool implements Tool {
   onPointerDown(e: ToolPointerEvent, ctx: ToolContext): void {
     const doc = ctx.getDocument()
 
-    // A selected mesh's grid points grab first (they can hang outside the fill).
+    // The selected point's tangent handles grab first (they sit off the grid).
+    const handles = meshHandleLayout(doc.nodes, ctx.meshEdit.get(), ctx.getViewport())
+    if (handles) {
+      const dir = hitMeshHandle(handles, e.screenPoint)
+      if (dir) {
+        this.handleDrag = { nodeId: handles.nodeId, index: handles.index, dir, moved: false }
+        return
+      }
+    }
+
+    // A selected mesh's grid points grab next (they can hang outside the fill).
     const layout = meshOverlayLayout(doc.nodes, ctx.getSelection(), ctx.getViewport())
     if (layout) {
       const index = hitMeshPoint(layout, e.screenPoint)
@@ -83,6 +97,23 @@ export class GradientMeshTool implements Tool {
   }
 
   onPointerMove(e: ToolPointerEvent, ctx: ToolContext): void {
+    if (this.handleDrag) {
+      const d = e.screenDeltaFromDown
+      if (!this.handleDrag.moved && Math.hypot(d.x, d.y) < DRAG_THRESHOLD_PX) return
+      if (!this.handleDrag.moved) {
+        this.handleDrag.moved = true
+        ctx.transaction.begin('Adjust Mesh Handle')
+      }
+      // Alt breaks the point's symmetry (moves this handle independently).
+      ctx.mesh.setHandle(
+        this.handleDrag.nodeId,
+        this.handleDrag.index,
+        this.handleDrag.dir,
+        this.toLocal(ctx, this.handleDrag.nodeId, e.docPoint),
+        !e.modifiers.alt,
+      )
+      return
+    }
     if (!this.drag) return
     const d = e.screenDeltaFromDown
     if (!this.drag.moved && Math.hypot(d.x, d.y) < DRAG_THRESHOLD_PX) return
@@ -98,13 +129,16 @@ export class GradientMeshTool implements Tool {
   }
 
   onPointerUp(_e: ToolPointerEvent, ctx: ToolContext): void {
+    if (this.handleDrag?.moved && ctx.transaction.active()) ctx.transaction.commit()
     if (this.drag?.moved && ctx.transaction.active()) ctx.transaction.commit()
+    this.handleDrag = null
     this.drag = null
   }
 
   onCancel(_ctx: ToolContext): void {
     // The manager rolls back any open transaction (undoing the partial drag).
     this.drag = null
+    this.handleDrag = null
   }
 
   onDeactivate(ctx: ToolContext): void {

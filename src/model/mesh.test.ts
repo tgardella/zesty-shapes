@@ -8,8 +8,10 @@ import {
   meshGridLines,
   meshIndex,
   meshPointAt,
+  meshPointHandleTargets,
   meshQuads,
   meshRowPoint,
+  meshRowCol,
   meshSurfacePoint,
 } from './mesh'
 import { createRectNode, createEllipseNode } from './nodes'
@@ -104,6 +106,27 @@ describe('curved surface (Catmull-Rom)', () => {
     // And the line still passes exactly through the grid points.
     expect(meshRowPoint(mesh, 1, 0, 1)).toEqual({ x: 50, y: 10 })
     expect(meshGridLines(mesh).length).toBe(6) // 3 row + 3 column lines
+  })
+})
+
+describe('mesh tangent handles', () => {
+  it('an explicit handle bends the row curve off the straight edge', () => {
+    const mesh = rectMesh()
+    // The unwarped top edge is flat (y = 0 everywhere).
+    expect(meshRowPoint(mesh, 0, 0, 0.5).y).toBeCloseTo(0)
+    // Bend the top-left point's RIGHT handle upward.
+    mesh.points[0] = { ...mesh.points[0]!, handles: { right: { x: 25, y: -40 } } }
+    expect(meshRowPoint(mesh, 0, 0, 0.5).y).toBeLessThan(-5)
+    // The endpoints still interpolate exactly.
+    expect(meshRowPoint(mesh, 0, 0, 0)).toEqual({ x: 0, y: 0 })
+    expect(meshRowPoint(mesh, 0, 0, 1)).toEqual({ x: 100, y: 0 })
+  })
+
+  it('meshPointHandleTargets returns only the in-bounds directions', () => {
+    const mesh = rectMesh() // 1x1: every point is a corner (two directions)
+    const corner = meshPointHandleTargets(mesh, 0).map((h) => h.dir).sort()
+    expect(corner).toEqual(['down', 'right'])
+    expect(meshRowCol(mesh, 3)).toEqual({ r: 1, c: 1 })
   })
 })
 

@@ -18,10 +18,13 @@ import type {
   Style,
 } from '../model/types'
 import type { SprayStamp } from '../store/sprayCommands'
+import type { SymbolismParams } from '../store/symbolismCommands'
 import type { ViewportState } from '../store/coords'
 import type { AddNodeOptions, Appearance } from '../store/commands'
 import type { Face } from '../model/booleanOps'
-import type { BrushPreset, PathEditState, PenPreview, StyleTarget } from '../store/store'
+import type { PathEditState, PenPreview, StyleTarget } from '../store/store'
+import type { BrushDef } from '../model/brushLibrary'
+import type { MeshHandleDir } from '../model/mesh'
 import type { SnapGuide } from '../snapping/types'
 
 export interface ToolModifiers {
@@ -126,6 +129,8 @@ export interface ToolContext {
     editTextNode(nodeId: NodeId): void
     /** Blend two objects into a Blend group with N interpolated steps. */
     blend(aId: NodeId, bId: NodeId, steps: number): NodeId | null
+    /** Set (or clear, with null) the LOCAL-space spine control points of live blends. */
+    setBlendSpine(ids: NodeId[], controls: Vec2[] | null): void
     /** Blob Brush: filled blob from a trail, merged with same-colored blobs. */
     blobPaint(trail: Vec2[], diameter: number, paint: SolidPaint): NodeId | null
     /** Symbol Sprayer: the group stamps land in (one per spray gesture). */
@@ -134,8 +139,18 @@ export interface ToolContext {
     sprayStamp(sourceIds: NodeId[], stamp: SprayStamp, groupId: NodeId): NodeId[]
     /** Stamp one instance of a LIBRARY symbol into `parentId`. */
     stampSymbol(symbolId: string, stamp: SprayStamp, parentId?: NodeId): NodeId[]
+    /** Symbolism adjusters: nudge/tint a symbol set's instances within a radius. */
+    symbolismAdjust(groupIds: NodeId[], params: SymbolismParams): boolean
     /** Shape/path -> 1x1 gradient mesh in place (id/transform preserved). */
     convertToMesh(id: NodeId): boolean
+    /** Place brush artwork (scatter/pattern/art) along a DOC-space trail. */
+    brushArtwork(params: {
+      brush: BrushDef
+      polyline: Vec2[]
+      size: number
+      color: RGBA
+      symbolId: string | null
+    }): NodeId | null
   }
 
   /** Gradient Mesh point editing (Gradient Mesh tool, U). */
@@ -144,6 +159,14 @@ export interface ToolContext {
     addDivision(id: NodeId, localPoint: Vec2, color?: RGBA): number
     movePoint(id: NodeId, index: number, localPoint: Vec2): void
     setPointColor(id: NodeId, index: number, color: RGBA): void
+    /** Drag one tangent handle of a mesh point (mirror keeps it smooth). */
+    setHandle(
+      id: NodeId,
+      index: number,
+      dir: MeshHandleDir,
+      localPoint: Vec2,
+      mirror: boolean,
+    ): void
   }
 
   /** Appearance UI state shared with the panel (never undoable). */
@@ -174,9 +197,9 @@ export interface ToolContext {
     activeId(): string | null
   }
 
-  /** Paintbrush stroke-shape preset (top-bar selector). */
+  /** Active Paintbrush brush from the library (top-bar selector). */
   brush: {
-    preset(): BrushPreset
+    activeDef(): BrushDef
   }
 
   /** In-place text editing target (HTML overlay); never undoable. */

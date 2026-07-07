@@ -29,6 +29,10 @@ export const TOOL_SIZE_SPECS: Record<string, ToolSizeSpec> = {
   paintbrush: { default: 6, min: 0.5, max: 64, label: 'Size' },
   'blob-brush': { default: 16, min: 1, max: 200, label: 'Size' },
   'symbol-sprayer': { default: 80, min: 16, max: 400, label: 'Size' },
+  'symbol-shifter': { default: 100, min: 16, max: 400, label: 'Size' },
+  'symbol-scruncher': { default: 100, min: 16, max: 400, label: 'Size' },
+  'symbol-sizer': { default: 100, min: 16, max: 400, label: 'Size' },
+  'symbol-stainer': { default: 100, min: 16, max: 400, label: 'Size' },
   blend: { default: 5, min: 1, max: 24, label: 'Steps', cursor: false, step: 1 },
 }
 

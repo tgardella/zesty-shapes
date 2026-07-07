@@ -65,7 +65,7 @@ function bilerpColor(c00: RGBA, c10: RGBA, c01: RGBA, c11: RGBA, u: number, v: n
 // collinear controls every CR term is a multiple of the segment direction.
 // ---------------------------------------------------------------------------
 
-function crVec(p0: Vec2, p1: Vec2, p2: Vec2, p3: Vec2, t: number): Vec2 {
+export function crVec(p0: Vec2, p1: Vec2, p2: Vec2, p3: Vec2, t: number): Vec2 {
   const t2 = t * t
   const t3 = t2 * t
   const w0 = -0.5 * t3 + t2 - 0.5 * t
@@ -82,22 +82,102 @@ function clampIndex(v: number, max: number): number {
   return v < 0 ? 0 : v > max ? max : v
 }
 
+const vadd = (a: Vec2, b: Vec2): Vec2 => ({ x: a.x + b.x, y: a.y + b.y })
+const vsub = (a: Vec2, b: Vec2): Vec2 => ({ x: a.x - b.x, y: a.y - b.y })
+const vscale = (a: Vec2, k: number): Vec2 => ({ x: a.x * k, y: a.y * k })
+
+/** Cubic Bezier point. */
+function bez(p0: Vec2, h1: Vec2, h2: Vec2, p3: Vec2, u: number): Vec2 {
+  const mu = 1 - u
+  const a = mu * mu * mu
+  const b = 3 * mu * mu * u
+  const c = 3 * mu * u * u
+  const d = u * u * u
+  return {
+    x: a * p0.x + b * h1.x + c * h2.x + d * p3.x,
+    y: a * p0.y + b * h1.y + c * h2.y + d * p3.y,
+  }
+}
+
+/**
+ * A mesh point's tangent OFFSET along one axis: (neighbor+ − neighbor−)/6, the
+ * standard Catmull-Rom → Bezier handle. Auto handles are `p ± tangent`; a
+ * point without explicit handles reproduces the old Catmull-Rom surface exactly.
+ */
+function rowTangent(node: MeshNode, r: number, c: number): Vec2 {
+  const at = (cc: number): Vec2 => node.points[meshIndex(node, r, clampIndex(cc, node.cols))]!.p
+  return vscale(vsub(at(c + 1), at(c - 1)), 1 / 6)
+}
+function colTangent(node: MeshNode, r: number, c: number): Vec2 {
+  const at = (rr: number): Vec2 => node.points[meshIndex(node, clampIndex(rr, node.rows), c)]!.p
+  return vscale(vsub(at(r + 1), at(r - 1)), 1 / 6)
+}
+
+/** Resolved out/in handles for the row segment (r,c) -> (r,c+1). */
+function rowHandles(node: MeshNode, r: number, c: number): { h1: Vec2; h2: Vec2 } {
+  const left = node.points[meshIndex(node, r, c)]!
+  const right = node.points[meshIndex(node, r, clampIndex(c + 1, node.cols))]!
+  return {
+    h1: left.handles?.right ?? vadd(left.p, rowTangent(node, r, c)),
+    h2: right.handles?.left ?? vsub(right.p, rowTangent(node, r, clampIndex(c + 1, node.cols))),
+  }
+}
+
+/** Resolved out/in handles for the column segment (r,c) -> (r+1,c). */
+function colHandles(node: MeshNode, r: number, c: number): { h1: Vec2; h2: Vec2 } {
+  const top = node.points[meshIndex(node, r, c)]!
+  const bottom = node.points[meshIndex(node, clampIndex(r + 1, node.rows), c)]!
+  return {
+    h1: top.handles?.down ?? vadd(top.p, colTangent(node, r, c)),
+    h2: bottom.handles?.up ?? vsub(bottom.p, colTangent(node, clampIndex(r + 1, node.rows), c)),
+  }
+}
+
 /** Point on horizontal grid line `r` at local `s` across cell column `c`. */
 export function meshRowPoint(node: MeshNode, r: number, c: number, s: number): Vec2 {
-  const at = (cc: number): Vec2 => node.points[meshIndex(node, r, clampIndex(cc, node.cols))]!.p
-  return crVec(at(c - 1), at(c), at(c + 1), at(c + 2), s)
+  const p0 = node.points[meshIndex(node, r, c)]!.p
+  const p3 = node.points[meshIndex(node, r, clampIndex(c + 1, node.cols))]!.p
+  const { h1, h2 } = rowHandles(node, r, c)
+  return bez(p0, h1, h2, p3, s)
 }
 
 /** Point on vertical grid line `c` at local `t` across cell row `r`. */
 export function meshColPoint(node: MeshNode, c: number, r: number, t: number): Vec2 {
-  const at = (rr: number): Vec2 => node.points[meshIndex(node, clampIndex(rr, node.rows), c)]!.p
-  return crVec(at(r - 1), at(r), at(r + 1), at(r + 2), t)
+  const p0 = node.points[meshIndex(node, r, c)]!.p
+  const p3 = node.points[meshIndex(node, clampIndex(r + 1, node.rows), c)]!.p
+  const { h1, h2 } = colHandles(node, r, c)
+  return bez(p0, h1, h2, p3, t)
 }
 
-/** Smooth surface position inside cell (r, c) at local (s, t). */
+/**
+ * Smooth surface position inside cell (r, c) at local (s, t). Horizontal
+ * curvature comes from the bezier row curves; vertical curvature blends the
+ * two corner columns' handles across `s`, so the cell edges (s=0, s=1) match
+ * the vertical grid lines exactly.
+ */
 export function meshSurfacePoint(node: MeshNode, r: number, c: number, s: number, t: number): Vec2 {
   const q = (rr: number): Vec2 => meshRowPoint(node, clampIndex(rr, node.rows), c, s)
-  return crVec(q(r - 1), q(r), q(r + 1), q(r + 2), t)
+  const p1 = q(r)
+  const p2 = q(r + 1)
+  const autoH1 = vadd(p1, vscale(vsub(q(r + 1), q(r - 1)), 1 / 6))
+  const autoH2 = vsub(p2, vscale(vsub(q(r + 2), q(r)), 1 / 6))
+  const cR = clampIndex(c + 1, node.cols)
+  const rB = clampIndex(r + 1, node.rows)
+  const downL = node.points[meshIndex(node, r, c)]!.handles?.down
+  const downR = node.points[meshIndex(node, r, cR)]!.handles?.down
+  const upL = node.points[meshIndex(node, rB, c)]!.handles?.up
+  const upR = node.points[meshIndex(node, rB, cR)]!.handles?.up
+  const h1 = blendHandle(downL, downR, autoH1, s)
+  const h2 = blendHandle(upL, upR, autoH2, s)
+  return bez(p1, h1, h2, p2, t)
+}
+
+/** Blend the two corner-column handles across `s`, falling back to `auto`. */
+function blendHandle(left: Vec2 | undefined, right: Vec2 | undefined, auto: Vec2, s: number): Vec2 {
+  if (!left && !right) return auto
+  const l = left ?? auto
+  const r = right ?? auto
+  return { x: l.x + (r.x - l.x) * s, y: l.y + (r.y - l.y) * s }
 }
 
 /**
@@ -152,6 +232,46 @@ export function meshFromShape(node: ShapeNode | PathNode): MeshNode {
   }
   if (clip !== undefined) mesh.clip = clip
   return mesh
+}
+
+export type MeshHandleDir = 'left' | 'right' | 'up' | 'down'
+export const MESH_HANDLE_OPPOSITE: Record<MeshHandleDir, MeshHandleDir> = {
+  left: 'right',
+  right: 'left',
+  up: 'down',
+  down: 'up',
+}
+
+export interface MeshHandleTarget {
+  dir: MeshHandleDir
+  /** Current handle position (explicit if set, else the automatic tangent). */
+  local: Vec2
+}
+
+/** (row, col) of a grid-point index. */
+export function meshRowCol(node: Pick<MeshNode, 'cols'>, index: number): { r: number; c: number } {
+  const cols1 = node.cols + 1
+  return { r: Math.floor(index / cols1), c: index % cols1 }
+}
+
+/**
+ * The tangent-handle positions of one grid point, one per direction that has a
+ * neighbor (interior points get all four; corners get two). Explicit handles
+ * win; missing ones fall back to the automatic Catmull-Rom tangent — so the
+ * Gradient Mesh tool can seed a drag from the current visible curvature.
+ */
+export function meshPointHandleTargets(node: MeshNode, index: number): MeshHandleTarget[] {
+  const pt = node.points[index]
+  if (!pt) return []
+  const { r, c } = meshRowCol(node, index)
+  const rt = rowTangent(node, r, c)
+  const ct = colTangent(node, r, c)
+  const out: MeshHandleTarget[] = []
+  if (c > 0) out.push({ dir: 'left', local: pt.handles?.left ?? vsub(pt.p, rt) })
+  if (c < node.cols) out.push({ dir: 'right', local: pt.handles?.right ?? vadd(pt.p, rt) })
+  if (r > 0) out.push({ dir: 'up', local: pt.handles?.up ?? vsub(pt.p, ct) })
+  if (r < node.rows) out.push({ dir: 'down', local: pt.handles?.down ?? vadd(pt.p, ct) })
+  return out
 }
 
 /** Grid boundary as one closed polygonal subpath (hit/selection fallback). */

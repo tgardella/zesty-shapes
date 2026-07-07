@@ -27,7 +27,8 @@ import {
   selectionHandleLayout,
 } from '../tools/handles'
 import { gradientAnnotatorLayout } from '../tools/gradientAnnotator'
-import { meshOverlayLayout } from '../tools/meshEditShared'
+import { blendSpineLayout } from '../tools/blendSpineShared'
+import { meshHandleLayout, meshOverlayLayout } from '../tools/meshEditShared'
 import { defaultToolSize, isSizeableTool, TOOL_SIZE_SPECS } from '../tools/toolSizes'
 import { widthHandleLayout } from '../tools/widthEditShared'
 
@@ -147,6 +148,7 @@ export function Overlay() {
       <PathEditOverlay />
       <PenPreviewView />
       <GradientAnnotatorView />
+      <BlendSpineOverlay />
       <MeshEditOverlay />
       <WidthEditOverlay />
       <FacePreviewView />
@@ -419,6 +421,56 @@ function GradientAnnotatorView() {
 }
 
 /**
+ * Blend spine (Blend tool, W): the path the interpolated steps follow, with a
+ * square control point at each vertex and a round add-handle at the arc
+ * midpoint. Layout comes from tools/blendSpineShared — the SAME function the
+ * tool hit-tests against. Dashed so it reads as a guide, not real geometry.
+ */
+function BlendSpineOverlay() {
+  const activeToolId = useEditor((s) => s.tool.activeToolId)
+  const nodes = useEditor((s) => s.document.nodes)
+  const selection = useEditor((s) => s.selection)
+  const viewport = useEditor((s) => s.viewport)
+  if (activeToolId !== 'blend') return null
+  const layout = blendSpineLayout(nodes, selection, viewport)
+  if (!layout) return null
+  const r = 3.5
+  return (
+    <g>
+      <polyline
+        points={layout.polylineScreen.map((p) => `${p.x},${p.y}`).join(' ')}
+        fill="none"
+        stroke={ACCENT}
+        strokeWidth={1.4}
+        strokeDasharray="5 3"
+        opacity={0.9}
+      />
+      <circle
+        cx={layout.insert.screen.x}
+        cy={layout.insert.screen.y}
+        r={r}
+        fill={ACCENT}
+        stroke="#ffffff"
+        strokeWidth={1}
+        opacity={0.85}
+      />
+      {layout.controlsScreen.map((p, i) => (
+        <rect
+          key={i}
+          x={p.x - r}
+          y={p.y - r}
+          width={r * 2}
+          height={r * 2}
+          fill="#ffffff"
+          stroke={ACCENT}
+          strokeWidth={1.4}
+        />
+      ))}
+    </g>
+  )
+}
+
+/**
  * Gradient Mesh grid (Gradient Mesh tool, U): the selected mesh's grid lines
  * and points, with the tool's selected point highlighted. Layout comes from
  * tools/meshEditShared — the SAME function the tool hit-tests against.
@@ -433,6 +485,8 @@ function MeshEditOverlay() {
   const layout = meshOverlayLayout(nodes, selection, viewport)
   if (!layout) return null
   const selectedIndex = meshEdit?.nodeId === layout.nodeId ? meshEdit.pointIndex : -1
+  // Tangent handles of the selected point (dots + connector lines).
+  const handles = meshHandleLayout(nodes, meshEdit, viewport)
   return (
     <g>
       {layout.linesScreen.map((line, i) => (
@@ -444,6 +498,19 @@ function MeshEditOverlay() {
           strokeWidth={1}
           opacity={0.75}
         />
+      ))}
+      {handles?.handles.map((h) => (
+        <g key={h.dir}>
+          <line
+            x1={handles.pointScreen.x}
+            y1={handles.pointScreen.y}
+            x2={h.screen.x}
+            y2={h.screen.y}
+            stroke={ACCENT}
+            strokeWidth={1}
+          />
+          <circle cx={h.screen.x} cy={h.screen.y} r={2.8} fill={ACCENT} />
+        </g>
       ))}
       {layout.pointsScreen.map((p, i) => (
         <circle

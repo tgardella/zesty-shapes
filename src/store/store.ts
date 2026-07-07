@@ -22,6 +22,7 @@ import type { Document, NodeId, Style } from '../model/types'
 import { createDocument } from '../model/document'
 import { createInitialDocument, isLayerNode, nearestLayer, normalizeLayers, topLevelLayers } from '../model/layers'
 import { defaultStyle } from '../model/nodes'
+import { DEFAULT_BRUSH_ID } from '../model/brushLibrary'
 import { loadDocumentFromStorage } from '../model/serialize'
 import type { Vec2 } from '../geometry/vec2'
 import type { BBox } from '../geometry/bbox'
@@ -103,8 +104,8 @@ export interface UiState {
   savedSelections: { name: string; ids: NodeId[] }[]
   /** Symbol the Symbols panel highlighted (the sprayer sprays it). */
   activeSymbolId: string | null
-  /** Paintbrush (B) stroke shape preset. */
-  brushPreset: BrushPreset
+  /** Active Paintbrush (B) brush from the brush library (model/brushLibrary). */
+  activeBrushId: string
 }
 
 /** Paintbrush stroke shapes: tapered ends, uniform, or angled-nib calligraphy. */
@@ -225,7 +226,7 @@ export interface EditorActions {
   setWidthEdit(id: NodeId | null): void
   setMeshEdit(edit: { nodeId: NodeId; pointIndex: number } | null): void
   setActiveSymbol(id: string | null): void
-  setBrushPreset(preset: BrushPreset): void
+  setActiveBrush(id: string): void
 
   /** Boolean-tool previews (Shape Builder face, Knife/Eraser trail); never undoable. */
   setFacePreview(region: Vec2[][] | null): void
@@ -302,7 +303,7 @@ export function createEditorStore(initialDocument?: Document): EditorStoreApi {
         targetedIds: [],
         savedSelections: [],
         activeSymbolId: null,
-        brushPreset: 'taper',
+        activeBrushId: DEFAULT_BRUSH_ID,
       },
       history: emptyHistory(),
 
@@ -509,9 +510,9 @@ export function createEditorStore(initialDocument?: Document): EditorStoreApi {
         const ui = get().ui
         if (ui.activeSymbolId !== id) set({ ui: { ...ui, activeSymbolId: id } })
       },
-      setBrushPreset(preset) {
+      setActiveBrush(id) {
         const ui = get().ui
-        if (ui.brushPreset !== preset) set({ ui: { ...ui, brushPreset: preset } })
+        if (ui.activeBrushId !== id) set({ ui: { ...ui, activeBrushId: id } })
       },
       setFacePreview(region) {
         const ui = get().ui

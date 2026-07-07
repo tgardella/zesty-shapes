@@ -4,8 +4,9 @@
  * bar (ui/MenuBar.tsx), like Illustrator.
  */
 
-import { editorStore, useEditor, type BrushPreset } from '../store/store'
+import { editorStore, useEditor } from '../store/store'
 import { cmdSetBlendSteps } from '../store/blendCommands'
+import { BUILTIN_BRUSHES } from '../model/brushLibrary'
 import { TOOL_SIZE_SPECS } from '../tools/toolSizes'
 
 /** Grid spacing presets in doc units (CSS px): 96/inch, ~37.8/cm. */
@@ -27,7 +28,7 @@ export function TopBar() {
   const gridSize = useEditor((s) => s.ui.gridSize)
   const activeToolId = useEditor((s) => s.tool.activeToolId)
   const toolSize = useEditor((s) => s.ui.toolSizes[s.tool.activeToolId])
-  const brushPreset = useEditor((s) => s.ui.brushPreset)
+  const activeBrushId = useEditor((s) => s.ui.activeBrushId)
 
   const zoomBy = (factor: number) => editorStore.getState().zoomAtPoint(viewportCenter(), factor)
   const sizeSpec = TOOL_SIZE_SPECS[activeToolId]
@@ -153,13 +154,15 @@ export function TopBar() {
       {activeToolId === 'paintbrush' && (
         <select
           className="grid-select"
-          value={brushPreset}
-          onChange={(e) => editorStore.getState().setBrushPreset(e.target.value as BrushPreset)}
-          title="Brush stroke shape"
+          value={activeBrushId}
+          onChange={(e) => editorStore.getState().setActiveBrush(e.target.value)}
+          title="Brush (scatter/pattern/art brushes place the active symbol along the path)"
         >
-          <option value="taper">Taper</option>
-          <option value="uniform">Uniform</option>
-          <option value="calligraphic">Calligraphic</option>
+          {BUILTIN_BRUSHES.map((b) => (
+            <option key={b.id} value={b.id}>
+              {b.name}
+            </option>
+          ))}
         </select>
       )}
 

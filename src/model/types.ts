@@ -233,8 +233,14 @@ export interface GroupNode extends BaseNode {
    * endpoints; the interpolated steps are DERIVED at render/export time
    * (model/blend.ts blendStepGeometry), so editing an endpoint re-blends.
    * Object > Expand Blend bakes the steps into real nodes and drops this.
+   *
+   * `spine` (optional) are control points in this group's LOCAL space that the
+   * interpolated steps follow — absent means the straight line between the two
+   * endpoint centroids. Editable with the Blend tool (drag/insert control
+   * points) or replaced from a selected path. Steps rotate to the spine's
+   * tangent unless `spineAlign` is false.
    */
-  blend?: { steps: number }
+  blend?: { steps: number; spine?: Vec2[]; spineAlign?: boolean }
 }
 
 /**
@@ -287,10 +293,25 @@ export interface ImageNode extends BaseNode {
   h: number
 }
 
+/**
+ * Optional per-direction tangent handles for a mesh point (ABSOLUTE local-space
+ * points, like path anchor handles). Absent handles fall back to the automatic
+ * Catmull-Rom tangent, so a plain mesh curves smoothly with no handles set.
+ * `left`/`right` shape the row (horizontal) curves; `up`/`down` the column ones.
+ */
+export interface MeshHandles {
+  left?: Vec2
+  right?: Vec2
+  up?: Vec2
+  down?: Vec2
+}
+
 /** One gradient-mesh grid point: position + color, both in LOCAL space. */
 export interface MeshPoint {
   p: Vec2
   color: RGBA
+  /** Hand-tuned bezier tangent handles; absent = automatic curvature. */
+  handles?: MeshHandles
 }
 
 /**

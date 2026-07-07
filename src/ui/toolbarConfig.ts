@@ -31,7 +31,7 @@ export const TOOL_GROUPS: readonly (readonly string[])[] = [
   ['gradient-mesh'],
   ['eyedropper'],
   ['blend'],
-  ['symbol-sprayer'],
+  ['symbol-sprayer', 'symbol-shifter', 'symbol-scruncher', 'symbol-sizer', 'symbol-stainer'],
   ['artboard'],
 ]
 

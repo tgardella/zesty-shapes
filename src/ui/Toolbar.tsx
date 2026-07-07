@@ -214,6 +214,31 @@ const ICONS: Record<string, ReactNode> = {
       <circle cx="15.5" cy="3.5" r="0.9" fill="currentColor" stroke="none" />
     </g>
   ),
+  'symbol-shifter': (
+    <g fill="none" stroke="currentColor" strokeWidth="1.4">
+      <circle cx="6.5" cy="10" r="2" />
+      <circle cx="13" cy="10" r="2" opacity="0.5" />
+      <path d="M9 10 L12 10 M11 8.5 L12.5 10 L11 11.5" strokeWidth="1.2" />
+    </g>
+  ),
+  'symbol-scruncher': (
+    <g fill="none" stroke="currentColor" strokeWidth="1.3">
+      <circle cx="10" cy="10" r="1.6" fill="currentColor" stroke="none" />
+      <path d="M4 4 L7 7 M16 4 L13 7 M4 16 L7 13 M16 16 L13 13" />
+    </g>
+  ),
+  'symbol-sizer': (
+    <g fill="none" stroke="currentColor" strokeWidth="1.4">
+      <circle cx="8" cy="12" r="2.4" />
+      <circle cx="14" cy="7" r="3.4" opacity="0.7" />
+    </g>
+  ),
+  'symbol-stainer': (
+    <g fill="none" stroke="currentColor" strokeWidth="1.3">
+      <path d="M12 3 L15 6 L8 13 L5 13 L5 10 Z" />
+      <path d="M5 16 L15 16" strokeWidth="1.6" />
+    </g>
+  ),
   artboard: (
     <g fill="none" stroke="currentColor" strokeWidth="1.5">
       <rect x="5" y="5" width="10" height="10" />
