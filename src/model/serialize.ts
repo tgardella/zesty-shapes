@@ -136,6 +136,28 @@ function nodeToSVG(doc: Document, id: NodeId, reg: DefsRegistry): string {
   // Template layers are tracing aids — never printed/exported (Illustrator).
   if (node.type === 'group' && node.template) return ''
   if (node.type === 'group') {
+    // Clipping mask: the `clip` child's outline clips the other children.
+    // Mirrors NodeView — a <clipPath> from the mask's silhouette wraps the
+    // remaining children; the mask itself is not painted as visible art.
+    if (node.clip) {
+      const clipChild = doc.nodes[node.clip]
+      if (clipChild && clipChild.type !== 'group' && clipChild.type !== 'text') {
+        const clipD = subpathsToPathData(toSubPaths(clipChild))
+        const clipT = isIdentity(clipChild.transform)
+          ? ''
+          : ` transform="${toSvgTransform(clipChild.transform)}"`
+        const clipId = `clip-${escapeXml(node.id)}`
+        const inner = node.children
+          .filter((childId) => childId !== node.clip)
+          .map((childId) => nodeToSVG(doc, childId, reg))
+          .join('')
+        return (
+          `<g id="${escapeXml(node.id)}"${commonAttrs(node)}>` +
+          `<clipPath id="${clipId}"><path d="${clipD}"${clipT}/></clipPath>` +
+          `<g clip-path="url(#${clipId})">${inner}</g></g>`
+        )
+      }
+    }
     // LIVE blend: endpoints + derived steps (same geometry the canvas draws).
     if (node.blend && node.children.length === 2) {
       const steps = blendStepGeometry(doc.nodes, node.id)
@@ -153,6 +175,28 @@ function nodeToSVG(doc: Document, id: NodeId, reg: DefsRegistry): string {
     const inner = node.children.map((childId) => nodeToSVG(doc, childId, reg)).join('')
     return `<g id="${escapeXml(node.id)}"${commonAttrs(node)}>${inner}</g>`
   }
+  // Leaf nodes: build the element, then wrap in a live drop-shadow filter if
+  // the style carries one (mirrors NodeView).
+  const leaf = leafToSVG(node, reg)
+  if (leaf !== '' && node.style.dropShadow) return wrapDropShadow(node, leaf)
+  return leaf
+}
+
+/** feDropShadow wrapper (mirrors NodeView.DropShadowFilter). */
+function wrapDropShadow(node: SceneNode, inner: string): string {
+  const s = node.style.dropShadow!
+  const flood = s.color.a < 1 ? ` flood-opacity="${s.color.a}"` : ''
+  const id = `shadow-${escapeXml(node.id)}`
+  return (
+    `<g><filter id="${id}" x="-50%" y="-50%" width="200%" height="200%">` +
+    `<feDropShadow dx="${s.offsetX}" dy="${s.offsetY}" stdDeviation="${s.blur}"` +
+    ` flood-color="${cssColor(s.color)}"${flood}/></filter>` +
+    `<g filter="url(#${id})">${inner}</g></g>`
+  )
+}
+
+/** One leaf node's SVG element (no drop-shadow wrapping). */
+function leafToSVG(node: SceneNode, reg: DefsRegistry): string {
   if (node.type === 'text') return textToSVG(node, reg)
   if (node.type === 'image') {
     return (
@@ -161,6 +205,7 @@ function nodeToSVG(doc: Document, id: NodeId, reg: DefsRegistry): string {
     )
   }
   if (node.type === 'mesh') return meshToSVG(node)
+  if (node.type === 'group') return ''
   if (hasWidthProfile(node.style)) return variableWidthToSVG(node, reg)
   const d = subpathsToPathData(toSubPaths(node))
   if (d === '') return ''

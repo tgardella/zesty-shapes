@@ -331,6 +331,64 @@ export function cmdOutlineStroke(store: EditorStoreApi, ids: NodeId[]): NodeId[]
 }
 
 // ---------------------------------------------------------------------------
+// Offset Path
+// ---------------------------------------------------------------------------
+
+/**
+ * Grow (distance > 0) or shrink (distance < 0) filled regions by `distance`.
+ * Built on the stroke-outline engine: a centered stroke of width 2·|distance|
+ * along the region boundary is a band straddling it by |distance| on each
+ * side; uniting that band with the region pushes the edge outward, subtracting
+ * it pulls the edge inward. Round joins (matching Illustrator's default).
+ */
+export function offsetRegions(regions: Regions, distance: number): Regions {
+  if (distance === 0 || regions.length === 0) return regions
+  const style: Style = {
+    fill: null,
+    stroke: { type: 'solid', color: { r: 0, g: 0, b: 0, a: 1 } },
+    strokeWidth: Math.abs(distance) * 2,
+    strokeCap: 'butt',
+    strokeJoin: 'round',
+    strokeDash: [],
+    fillRule: 'nonzero',
+  }
+  const band = outlineStroke(regionsToSubPaths(regions), style)
+  if (!band || band.length === 0) return regions
+  const result = distance > 0 ? union(regions, band) : difference(regions, band)
+  return dropSlivers(result)
+}
+
+/**
+ * Offset Path (Object > Path > Offset Path): each filled selected leaf gains a
+ * sibling path grown/shrunk by `distance` (doc units), placed just above its
+ * source (the source is KEPT, matching Illustrator). Returns the new ids.
+ */
+export function cmdOffsetPath(store: EditorStoreApi, ids: NodeId[], distance: number): NodeId[] {
+  const doc = store.getState().document
+  if (distance === 0) return []
+  const results: Array<{ srcId: NodeId; node: PathNode }> = []
+  for (const op of collectOperands(doc, ids)) {
+    const offset = offsetRegions(op.regions, distance)
+    if (offset.length === 0) continue
+    const placeParent = doc.nodes[op.id]!.parent ?? doc.root
+    const node = resultNode(doc, placeParent, offset, cloneStyle(doc.nodes[op.id]!.style), 'Offset')
+    results.push({ srcId: op.id, node })
+  }
+  if (results.length === 0) return []
+  store.getState().applyCommand(
+    'Offset Path',
+    (draft) => {
+      for (const r of results) {
+        const { parentId, index } = placementOf(draft, r.srcId)
+        addNode(draft, r.node, parentId, Math.min(index + 1, childCount(draft, parentId)))
+      }
+    },
+    { selectAfter: results.map((r) => r.node.id) },
+  )
+  return results.map((r) => r.node.id)
+}
+
+// ---------------------------------------------------------------------------
 // Knife / Eraser
 // ---------------------------------------------------------------------------
 

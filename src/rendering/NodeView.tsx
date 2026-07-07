@@ -32,6 +32,8 @@ import { hasWidthProfile } from '../model/widthProfile'
 import { liveDefs } from '../store/liveDefs'
 import { editorStore, useEditor } from '../store/store'
 import { svgPaintProps } from './styleAttrs'
+import { cssColor } from '../model/defs'
+import type { DropShadow } from '../model/types'
 
 /**
  * Non-reactive resolver: idempotently syncs the live registry against the
@@ -54,6 +56,30 @@ export const NodeView = memo(function NodeView({ id }: { id: NodeId }) {
     node.blendMode !== 'normal' ? { mixBlendMode: node.blendMode } : undefined
 
   if (node.type === 'group') {
+    // Clipping mask: the `clip` child's silhouette clips the other children.
+    // The clip child is NOT painted as visible art (only its outline is used).
+    const clipChild = node.clip ? editorStore.getState().document.nodes[node.clip] : undefined
+    if (node.clip && clipChild && clipChild.type !== 'group' && clipChild.type !== 'text') {
+      const clipId = `clip-${id}`
+      const clipD = subpathsToPathData(toSubPaths(clipChild))
+      const clipTransform = isIdentity(clipChild.transform)
+        ? undefined
+        : toSvgTransform(clipChild.transform)
+      return (
+        <g data-node-id={id} transform={transform} opacity={opacity} style={style}>
+          <clipPath id={clipId}>
+            <path d={clipD} transform={clipTransform} />
+          </clipPath>
+          <g clipPath={`url(#${clipId})`}>
+            {node.children
+              .filter((childId) => childId !== node.clip)
+              .map((childId) => (
+                <NodeView key={childId} id={childId} />
+              ))}
+          </g>
+        </g>
+      )
+    }
     if (node.blend && node.children.length === 2) {
       return (
         <g data-node-id={id} transform={transform} opacity={opacity} style={style}>
@@ -72,8 +98,34 @@ export const NodeView = memo(function NodeView({ id }: { id: NodeId }) {
     )
   }
 
-  return <ShapeView node={node} transform={transform} opacity={opacity} style={style} />
+  const shape = <ShapeView node={node} transform={transform} opacity={opacity} style={style} />
+  // Non-destructive drop shadow: a live <filter> sibling; the leaf renders
+  // inside a group referencing it (uniform for every leaf type).
+  if (node.style.dropShadow) {
+    return (
+      <g>
+        <DropShadowFilter id={id} shadow={node.style.dropShadow} />
+        <g filter={`url(#shadow-${id})`}>{shape}</g>
+      </g>
+    )
+  }
+  return shape
 })
+
+/** feDropShadow filter for one node (generous region so blur isn't clipped). */
+function DropShadowFilter({ id, shadow }: { id: NodeId; shadow: DropShadow }) {
+  return (
+    <filter id={`shadow-${id}`} x="-50%" y="-50%" width="200%" height="200%">
+      <feDropShadow
+        dx={shadow.offsetX}
+        dy={shadow.offsetY}
+        stdDeviation={shadow.blur}
+        floodColor={cssColor(shadow.color)}
+        floodOpacity={shadow.color.a}
+      />
+    </filter>
+  )
+}
 
 function ShapeView({
   node,

@@ -108,6 +108,49 @@ export function rotateDocTransform(
   return rotateMat(delta, center)
 }
 
+/**
+ * DOC-space reflection across the axis through the bbox center at the angle of
+ * the vector center->point (Illustrator's Reflect tool: drag to define the
+ * mirror axis). `snap45` (Shift) quantizes the axis to 45° steps. Reflection
+ * about a line at angle θ: [cos2θ, sin2θ, sin2θ, -cos2θ], sandwiched around the
+ * center so the center is the fixed point.
+ */
+export function reflectDocTransform(bbox: BBox, point: Vec2, snap45: boolean): Mat {
+  const center = { x: (bbox.minX + bbox.maxX) / 2, y: (bbox.minY + bbox.maxY) / 2 }
+  let angle = Math.atan2(point.y - center.y, point.x - center.x)
+  if (snap45) angle = Math.round(angle / ROTATE_SNAP) * ROTATE_SNAP
+  const c = Math.cos(2 * angle)
+  const s = Math.sin(2 * angle)
+  const reflect: Mat = [c, s, s, -c, 0, 0]
+  return compose(translate(center.x, center.y), reflect, translate(-center.x, -center.y))
+}
+
+/**
+ * DOC-space shear (skew) about the bbox center. Dragging horizontally shears
+ * along X (x += k·y, k from the horizontal drag scaled by half the bbox
+ * height); Shift shears along Y instead (y += k·x, from the vertical drag).
+ * The center stays fixed.
+ */
+export function shearDocTransform(
+  bbox: BBox,
+  startPoint: Vec2,
+  point: Vec2,
+  modifiers: Pick<ToolModifiers, 'shift'>,
+): Mat {
+  const center = { x: (bbox.minX + bbox.maxX) / 2, y: (bbox.minY + bbox.maxY) / 2 }
+  const halfH = Math.max(EPS, (bbox.maxY - bbox.minY) / 2)
+  const halfW = Math.max(EPS, (bbox.maxX - bbox.minX) / 2)
+  let shear: Mat
+  if (modifiers.shift) {
+    const ky = (point.y - startPoint.y) / halfW
+    shear = [1, ky, 0, 1, 0, 0]
+  } else {
+    const kx = (point.x - startPoint.x) / halfH
+    shear = [1, 0, kx, 1, 0, 0]
+  }
+  return compose(translate(center.x, center.y), shear, translate(-center.x, -center.y))
+}
+
 // ---------------------------------------------------------------------------
 // The gesture controller
 // ---------------------------------------------------------------------------
@@ -121,13 +164,22 @@ interface GestureBase {
   startDoc: Vec2
 }
 
+type TransformMode = 'scale' | 'rotate' | 'reflect' | 'shear'
+
+const MODE_LABEL: Record<TransformMode, string> = {
+  scale: 'Scale',
+  rotate: 'Rotate',
+  reflect: 'Reflect',
+  shear: 'Shear',
+}
+
 export class TransformHandleController {
-  private mode: 'scale' | 'rotate' | null = null
+  private mode: TransformMode | null = null
   private handleIndex = 0
   private base: GestureBase | null = null
 
   private readonly drag = new DragBehavior({
-    transactionLabel: () => (this.mode === 'rotate' ? 'Rotate' : 'Scale'),
+    transactionLabel: () => (this.mode ? MODE_LABEL[this.mode] : 'Scale'),
     onMove: (e, ctx) => this.apply(e, ctx),
     onEnd: () => this.reset(),
     onClick: () => this.reset(),
@@ -157,20 +209,38 @@ export class TransformHandleController {
 
   /** Rotate-anywhere entry point (Rotate tool): no handle needed. */
   beginRotate(e: ToolPointerEvent, ctx: ToolContext): boolean {
+    return this.beginMode('rotate', e, ctx)
+  }
+
+  /**
+   * Drag-anywhere entry for Reflect/Shear (no handle needed): the gesture is
+   * defined by the drag vector relative to the bbox center.
+   */
+  beginMode(mode: 'rotate' | 'reflect' | 'shear', e: ToolPointerEvent, ctx: ToolContext): boolean {
     const layout = selectionHandleLayout(ctx.getDocument().nodes, ctx.getSelection(), ctx.getViewport())
     if (!layout) return false
-    this.arm({ kind: 'rotate' }, layout.bboxDoc, e, ctx)
+    this.armMode(mode, 0, layout.bboxDoc, e, ctx)
     return true
   }
 
   private arm(hit: TransformHandleHit, bbox: BBox, e: ToolPointerEvent, ctx: ToolContext): void {
+    this.armMode(hit.kind, hit.kind === 'scale' ? hit.handleIndex : 0, bbox, e, ctx)
+  }
+
+  private armMode(
+    mode: TransformMode,
+    handleIndex: number,
+    bbox: BBox,
+    e: ToolPointerEvent,
+    ctx: ToolContext,
+  ): void {
     const doc = ctx.getDocument()
     const ids = orderedSubtreeRoots(doc, ctx.getSelection()).filter(
       (id) => doc.nodes[id] && !doc.nodes[id]!.locked,
     )
     if (ids.length === 0) return
-    this.mode = hit.kind
-    this.handleIndex = hit.kind === 'scale' ? hit.handleIndex : 0
+    this.mode = mode
+    this.handleIndex = handleIndex
     const baseWorlds = new Map<NodeId, Mat>()
     const parentInvs = new Map<NodeId, Mat>()
     for (const id of ids) {
@@ -202,15 +272,26 @@ export class TransformHandleController {
 
   private apply(e: ToolPointerEvent, ctx: ToolContext): void {
     if (!this.base || !this.mode) return
-    const D =
-      this.mode === 'scale'
-        ? scaleDocTransform(this.base.bbox, this.handleIndex, e.snappedPoint, e.modifiers)
-        : rotateDocTransform(this.base.bbox, this.base.startDoc, e.docPoint, e.modifiers.shift)
+    let D: Mat
+    switch (this.mode) {
+      case 'scale':
+        D = scaleDocTransform(this.base.bbox, this.handleIndex, e.snappedPoint, e.modifiers)
+        break
+      case 'rotate':
+        D = rotateDocTransform(this.base.bbox, this.base.startDoc, e.docPoint, e.modifiers.shift)
+        break
+      case 'reflect':
+        D = reflectDocTransform(this.base.bbox, e.docPoint, e.modifiers.shift)
+        break
+      case 'shear':
+        D = shearDocTransform(this.base.bbox, this.base.startDoc, e.docPoint, e.modifiers)
+        break
+    }
     const entries = this.base.ids.map((id) => ({
       id,
       transform: multiply(this.base!.parentInvs.get(id)!, multiply(D, this.base!.baseWorlds.get(id)!)),
     }))
-    ctx.commands.setTransforms(entries, this.mode === 'rotate' ? 'Rotate' : 'Scale')
+    ctx.commands.setTransforms(entries, MODE_LABEL[this.mode])
   }
 
   private reset(): void {

@@ -75,6 +75,22 @@ export interface WidthStop {
   width: number
 }
 
+/**
+ * Non-destructive drop shadow (Appearance panel). Rendered as a live SVG
+ * <filter> (feDropShadow) — no pixels are baked, so it stays editable and
+ * round-trips through JSON. Offsets/blur are in the node's LOCAL units.
+ */
+export interface DropShadow {
+  /** Horizontal offset (local units; +x right). */
+  offsetX: number
+  /** Vertical offset (local units; +y down). */
+  offsetY: number
+  /** Gaussian blur radius (feDropShadow stdDeviation); 0 = crisp edge. */
+  blur: number
+  /** Shadow color; its alpha becomes flood-opacity. */
+  color: RGBA
+}
+
 export interface Style {
   fill: Paint | null
   stroke: Paint | null
@@ -96,6 +112,8 @@ export interface Style {
    * Absent until the Stainer touches the object.
    */
   stainBase?: RGBA
+  /** Live drop-shadow effect (non-destructive SVG filter); absent = none. */
+  dropShadow?: DropShadow
 }
 
 // ---------------------------------------------------------------------------

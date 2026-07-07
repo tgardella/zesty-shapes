@@ -27,6 +27,7 @@ import {
   cmdUpdateNode,
 } from '../store/commands'
 import { cmdErase, cmdKnife, cmdShapeBuilder } from '../store/booleanCommands'
+import { cmdMakeClipMask, cmdReleaseClipMask } from '../store/clipCommands'
 import { cmdBlend, cmdSetBlendSpine } from '../store/blendCommands'
 import { cmdBlobPaint } from '../store/brushCommands'
 import { cmdBrushArtwork } from '../store/brushArtworkCommands'
@@ -233,6 +234,12 @@ export class ToolManager {
       }
       if (key === 'd') {
         cmdDuplicateNodes(this.store, state.selection, { offset: { x: 10, y: 10 } })
+        return true
+      }
+      // Clipping mask: ⌘7 make, ⌥⌘7 release (Illustrator bindings).
+      if (key === '7') {
+        if (e.altKey) cmdReleaseClipMask(this.store, state.selection)
+        else cmdMakeClipMask(this.store, state.selection)
         return true
       }
     }
