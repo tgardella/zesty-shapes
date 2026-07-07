@@ -10,6 +10,7 @@ import type { SceneNode, SubPath, NodeId } from '../model/types'
 import { bboxOf as cubicBBox } from './bezier'
 import { segmentsOfSubPath } from './pathData'
 import { toSubPaths } from '../model/nodes'
+import { layoutText } from '../model/textLayout'
 
 export interface BBox {
   minX: number
@@ -105,7 +106,8 @@ export function bboxOfSubPaths(subpaths: SubPath[]): BBox | null {
 /**
  * Node-local bbox (before the node's own transform).
  * Groups union their children's bboxes mapped through each child's transform.
- * TextNode returns null: text bboxes need font measurement (later phase).
+ * Text uses the layout engine with the registered measurer (canvas in the
+ * app, a deterministic approximation in tests).
  */
 export function localBBoxOfNode(
   node: SceneNode,
@@ -121,7 +123,7 @@ export function localBBoxOfNode(
     }
     return out
   }
-  if (node.type === 'text') return null
+  if (node.type === 'text') return layoutText(node).bbox
   return bboxOfSubPaths(toSubPaths(node))
 }
 

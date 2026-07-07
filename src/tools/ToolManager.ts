@@ -27,6 +27,7 @@ import {
   cmdUpdateNode,
 } from '../store/commands'
 import { cmdErase, cmdKnife, cmdShapeBuilder } from '../store/booleanCommands'
+import { finishTextEdit } from '../store/textCommands'
 import { copySelection, cutSelection, pasteClipboard } from '../store/clipboard'
 import { effectiveScopeId, type EditorStoreApi } from '../store/store'
 import { worldTransform } from '../store/worldTransform'
@@ -136,6 +137,7 @@ export class ToolManager {
     state.setPenPreview(null)
     state.setFacePreview(null)
     state.setCutTrail(null)
+    state.setLasso(null)
     this.down = null
   }
 
@@ -296,6 +298,18 @@ export class ToolManager {
           cmdShapeBuilder(store, sourceIds, faces, picked, mode),
         knife: (trail, ids) => cmdKnife(store, trail, ids),
         erase: (trail, radius, ids) => cmdErase(store, trail, radius, ids),
+        finishTextEdit: () => finishTextEdit(store),
+        editTextNode: (nodeId) => {
+          const node = g().document.nodes[nodeId]
+          if (!node || node.type !== 'text') return
+          // Deactivates the calling tool first (double-click-to-edit from the
+          // Selection tool), then opens the one-transaction edit session.
+          this.setActiveTool('type')
+          const state = g()
+          state.setSelection([nodeId])
+          state.beginTransaction('Edit Text')
+          state.setTextEdit({ nodeId })
+        },
       },
       style: {
         target: () => g().ui.styleTarget,
@@ -307,6 +321,10 @@ export class ToolManager {
         get: () => g().ui.widthEdit,
         set: (id) => g().setWidthEdit(id),
       },
+      textEdit: {
+        get: () => g().ui.textEdit,
+        set: (edit) => g().setTextEdit(edit),
+      },
       pathEdit: {
         get: () => g().ui.pathEdit,
         set: (pe) => g().setPathEdit(pe),
@@ -316,6 +334,7 @@ export class ToolManager {
         setGuides: (guides) => g().setSnapGuides(guides),
         setPenPreview: (preview) => g().setPenPreview(preview),
         setFacePreview: (region) => g().setFacePreview(region),
+        setLasso: (trail) => g().setLasso(trail),
         setCutTrail: (trail) => g().setCutTrail(trail),
       },
       hitTest: {

@@ -12,15 +12,18 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@expo-google-fonts/inter": "^0.4.2",
     "bezier-js": "^6.1.4",
     "immer": "^11.1.11",
     "nanoid": "^5.1.16",
+    "opentype.js": "^2.0.0",
     "polygon-clipping": "^0.15.7",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "zustand": "^5.0.14"
   },
   "devDependencies": {
+    "@types/opentype.js": "^1.3.10",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.3",

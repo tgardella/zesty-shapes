@@ -219,9 +219,16 @@ export interface GroupNode extends BaseNode {
 }
 
 /**
- * RESERVED: the Type tool ships in a later phase. The variant exists now so
- * types.ts, bbox, NodeView, serialize, and hittest don't all change at once later.
- * Text bbox requires font measurement, which is a runtime (DOM) concern.
+ * Text. LOCAL geometry conventions (the transform is still the sole
+ * placement mechanism, per the POSITIONING RULE):
+ * - point text: the first line's baseline starts at the local origin
+ *   (alignment offsets lines around x=0)
+ * - area text: the wrapping box spans (0,0)..(width,height); the first
+ *   baseline sits one ascent below the top
+ * - path text: glyph baselines follow `textPath` (local-space geometry,
+ *   usually copied from a clicked path node)
+ * Layout/measurement is a runtime concern (model/textLayout.ts + the
+ * registered measurer in model/textMetrics.ts).
  */
 export interface TextNode extends BaseNode {
   type: 'text'
@@ -232,6 +239,21 @@ export interface TextNode extends BaseNode {
   textAlign: 'left' | 'center' | 'right'
   /** Line height multiplier. */
   leading: number
+  /** Point text (default) or area text wrapped inside width x height. */
+  kind?: 'point' | 'area'
+  /** Area-text box, local units (required when kind === 'area'). */
+  width?: number
+  height?: number
+  /** Tracking in 1/1000 em (Illustrator convention). Default 0. */
+  tracking?: number
+  /** Pair kerning from the font. Default true. */
+  kerning?: boolean
+  /** Vertical type: columns top-to-bottom, advancing right-to-left. */
+  vertical?: boolean
+  /** Type on a path: baseline geometry in LOCAL space. Overrides kind. */
+  textPath?: SubPath[]
+  /** Arc-length start offset (0-1) along textPath. Default 0. */
+  pathStartOffset?: number
 }
 
 export type ShapeNode = RectNode | EllipseNode | PolygonNode | StarNode | LineNode

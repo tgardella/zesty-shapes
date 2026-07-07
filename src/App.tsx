@@ -11,6 +11,7 @@ import { createToolManager, type ToolManager } from './tools'
 import { AlignPanel } from './ui/AlignPanel'
 import { AppearancePanel } from './ui/AppearancePanel'
 import { PathfinderPanel } from './ui/PathfinderPanel'
+import { TextPanel } from './ui/TextPanel'
 import { LayersPanel } from './ui/LayersPanel'
 import { Toolbar } from './ui/Toolbar'
 import { TopBar } from './ui/TopBar'
@@ -50,6 +51,7 @@ export function App() {
       </div>
       <div className="sidebar">
         <AppearancePanel />
+        <TextPanel />
         <AlignPanel />
         <PathfinderPanel />
         <LayersPanel />

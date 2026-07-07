@@ -24,6 +24,7 @@ import type { GradientPaint, NodeId, SceneNode } from '../model/types'
 import { toSubPaths } from '../model/nodes'
 import { regionsToSubPaths } from '../model/booleanOps'
 import { outlineStroke } from '../model/strokeOutline'
+import { layoutText } from '../model/textLayout'
 import { hasWidthProfile } from '../model/widthProfile'
 import { liveDefs } from '../store/liveDefs'
 import { editorStore, useEditor } from '../store/store'
@@ -111,8 +112,76 @@ function ShapeView({
         <path {...common} d={subpathsToPathData(toSubPaths(node))} fillRule={node.style.fillRule} />
       )
     case 'text':
-      return null // RESERVED: Type tool ships in a later phase
+      return <TextView node={node} transform={transform} opacity={opacity} style={style} />
   }
+}
+
+/**
+ * Text rendering from the SAME layout the exporter and bbox use
+ * (model/textLayout with the canvas measurer): point/area text emits one
+ * <tspan> per line carrying a per-char x-list (exact tracking/kerning);
+ * path text and vertical type emit one <tspan> per glyph (with rotate for
+ * path text). Hidden while this node is being edited in place — the HTML
+ * editor overlay is the live view then. An invisible bbox rect makes the
+ * whole text block clickable — SVG text only hit-tests painted glyph pixels,
+ * which made clicking back into text unreliable.
+ */
+function TextView({
+  node,
+  transform,
+  opacity,
+  style,
+}: {
+  node: Extract<SceneNode, { type: 'text' }>
+  transform: string | undefined
+  opacity: number | undefined
+  style: CSSProperties | undefined
+}) {
+  const editing = useEditor((s) => s.ui.textEdit?.nodeId === node.id)
+  if (editing) return null
+  const layout = layoutText(node)
+  const b = layout.bbox
+  const hitRect =
+    Number.isFinite(b.minX) && b.maxX > b.minX && b.maxY > b.minY ? b : null
+  return (
+    <g data-node-id={node.id} transform={transform} opacity={opacity} style={style}>
+      {hitRect && (
+        <rect
+          x={hitRect.minX}
+          y={hitRect.minY}
+          width={hitRect.maxX - hitRect.minX}
+          height={hitRect.maxY - hitRect.minY}
+          fill="none"
+          stroke="none"
+          pointerEvents="fill"
+        />
+      )}
+      <text
+        {...svgPaintProps(node.style, resolveDefId)}
+        fontFamily={node.fontFamily}
+        fontSize={node.fontSize}
+        fontWeight={node.fontWeight}
+        xmlSpace="preserve"
+      >
+      {layout.mode === 'lines'
+        ? layout.lines.map((line, i) => (
+            <tspan key={i} x={line.xs.map((v) => Math.round(v * 100) / 100).join(' ')} y={line.y}>
+              {line.text}
+            </tspan>
+          ))
+        : layout.glyphs.map((g, i) => (
+            <tspan
+              key={i}
+              x={g.x}
+              y={g.y}
+              rotate={g.rotate !== undefined ? Math.round(g.rotate * 10) / 10 : undefined}
+            >
+              {g.char}
+            </tspan>
+          ))}
+      </text>
+    </g>
+  )
 }
 
 /**

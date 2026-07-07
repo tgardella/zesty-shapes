@@ -80,6 +80,10 @@ export interface UiState {
   facePreview: Vec2[][] | null
   /** Knife/Eraser freehand trail (DOC space) while dragging. */
   cutTrail: Vec2[] | null
+  /** Text node being edited in place (HTML overlay); never undoable. */
+  textEdit: { nodeId: NodeId } | null
+  /** Lasso (Q) freehand trail (DOC space) while dragging. */
+  lasso: Vec2[] | null
 }
 
 export interface EditorState {
@@ -153,6 +157,10 @@ export interface EditorActions {
   /** Boolean-tool previews (Shape Builder face, Knife/Eraser trail); never undoable. */
   setFacePreview(region: Vec2[][] | null): void
   setCutTrail(trail: Vec2[] | null): void
+
+  /** In-place text editing target + lasso trail; never undoable. */
+  setTextEdit(edit: { nodeId: NodeId } | null): void
+  setLasso(trail: Vec2[] | null): void
 }
 
 export type EditorStore = EditorState & EditorActions
@@ -193,6 +201,8 @@ export function createEditorStore(initialDocument?: Document): EditorStoreApi {
         widthEdit: null,
         facePreview: null,
         cutTrail: null,
+        textEdit: null,
+        lasso: null,
       },
       history: emptyHistory(),
 
@@ -395,6 +405,16 @@ export function createEditorStore(initialDocument?: Document): EditorStoreApi {
         const ui = get().ui
         if (ui.cutTrail === trail || (ui.cutTrail === null && trail === null)) return
         set({ ui: { ...ui, cutTrail: trail } })
+      },
+      setTextEdit(edit) {
+        const ui = get().ui
+        if (ui.textEdit === edit || (ui.textEdit === null && edit === null)) return
+        set({ ui: { ...ui, textEdit: edit } })
+      },
+      setLasso(trail) {
+        const ui = get().ui
+        if (ui.lasso === trail || (ui.lasso === null && trail === null)) return
+        set({ ui: { ...ui, lasso: trail } })
       },
     }
   })
