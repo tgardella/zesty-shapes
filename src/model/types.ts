@@ -228,6 +228,13 @@ export interface GroupNode extends BaseNode {
   template?: boolean
   /** Dim placed images on this layer to N% opacity (1-100); absent = 100%. */
   dimImages?: number
+  /**
+   * LIVE BLEND (Blend tool, W): this group's two children are the blend
+   * endpoints; the interpolated steps are DERIVED at render/export time
+   * (model/blend.ts blendStepGeometry), so editing an endpoint re-blends.
+   * Object > Expand Blend bakes the steps into real nodes and drops this.
+   */
+  blend?: { steps: number }
 }
 
 /**
@@ -334,6 +341,20 @@ export interface Artboard {
   h: number
 }
 
+/**
+ * A named symbol (Symbols panel): a self-contained subtree snapshot the
+ * Symbol Sprayer stamps and the panel places. Root nodes have parent=null;
+ * every id is private to the definition (instances re-clone with fresh ids).
+ */
+export interface SymbolDef {
+  id: string
+  name: string
+  /** Snapshot roots, in paint order. */
+  rootIds: NodeId[]
+  /** Id-keyed members of the snapshot (roots + descendants). */
+  nodes: Record<NodeId, SceneNode>
+}
+
 export interface Document {
   /** Schema version for forward-compatible migration on load. */
   version: 1
@@ -345,4 +366,6 @@ export interface Document {
   root: NodeId
   /** Document-root concept from day one; export-by-artboard depends on it. */
   artboards: Artboard[]
+  /** Named symbol library (Symbols panel). Absent = no symbols defined. */
+  symbols?: SymbolDef[]
 }

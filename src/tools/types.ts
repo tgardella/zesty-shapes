@@ -21,7 +21,7 @@ import type { SprayStamp } from '../store/sprayCommands'
 import type { ViewportState } from '../store/coords'
 import type { AddNodeOptions, Appearance } from '../store/commands'
 import type { Face } from '../model/booleanOps'
-import type { PathEditState, PenPreview, StyleTarget } from '../store/store'
+import type { BrushPreset, PathEditState, PenPreview, StyleTarget } from '../store/store'
 import type { SnapGuide } from '../snapping/types'
 
 export interface ToolModifiers {
@@ -132,6 +132,8 @@ export interface ToolContext {
     createSymbolSet(): NodeId
     /** Stamp one sprayed symbol instance into `groupId`. */
     sprayStamp(sourceIds: NodeId[], stamp: SprayStamp, groupId: NodeId): NodeId[]
+    /** Stamp one instance of a LIBRARY symbol into `parentId`. */
+    stampSymbol(symbolId: string, stamp: SprayStamp, parentId?: NodeId): NodeId[]
     /** Shape/path -> 1x1 gradient mesh in place (id/transform preserved). */
     convertToMesh(id: NodeId): boolean
   }
@@ -164,6 +166,17 @@ export interface ToolContext {
   meshEdit: {
     get(): { nodeId: NodeId; pointIndex: number } | null
     set(edit: { nodeId: NodeId; pointIndex: number } | null): void
+  }
+
+  /** Symbol library (Symbols panel): the sprayer sprays the active symbol. */
+  symbols: {
+    /** Active symbol id, or null when none is highlighted. */
+    activeId(): string | null
+  }
+
+  /** Paintbrush stroke-shape preset (top-bar selector). */
+  brush: {
+    preset(): BrushPreset
   }
 
   /** In-place text editing target (HTML overlay); never undoable. */

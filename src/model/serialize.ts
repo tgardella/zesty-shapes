@@ -22,6 +22,7 @@ import { isIdentity, toSvgTransform } from '../geometry/matrix'
 import { toSubPaths } from './nodes'
 import { layoutText } from './textLayout'
 import { hasWidthProfile } from './widthProfile'
+import { blendStepGeometry } from './blend'
 import { meshQuads, meshSeamWidth } from './mesh'
 import { outlineStroke } from './strokeOutline'
 import { regionsToSubPaths } from './booleanOps'
@@ -135,6 +136,20 @@ function nodeToSVG(doc: Document, id: NodeId, reg: DefsRegistry): string {
   // Template layers are tracing aids — never printed/exported (Illustrator).
   if (node.type === 'group' && node.template) return ''
   if (node.type === 'group') {
+    // LIVE blend: endpoints + derived steps (same geometry the canvas draws).
+    if (node.blend && node.children.length === 2) {
+      const steps = blendStepGeometry(doc.nodes, node.id)
+        .map((step, i) => {
+          const d = subpathsToPathData(regionsToSubPaths(step.regions))
+          if (d === '') return ''
+          const stepNode = { ...node, id: `${node.id}-step-${i + 1}`, style: step.style }
+          return `<path d="${d}" fill-rule="evenodd"${styleAttrs(stepNode, reg)}/>`
+        })
+        .join('')
+      const a = nodeToSVG(doc, node.children[0]!, reg)
+      const b = nodeToSVG(doc, node.children[1]!, reg)
+      return `<g id="${escapeXml(node.id)}"${commonAttrs(node)}>${a}${steps}${b}</g>`
+    }
     const inner = node.children.map((childId) => nodeToSVG(doc, childId, reg)).join('')
     return `<g id="${escapeXml(node.id)}"${commonAttrs(node)}>${inner}</g>`
   }

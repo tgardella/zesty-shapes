@@ -12,6 +12,7 @@ import { AlignPanel } from './ui/AlignPanel'
 import { AppearancePanel } from './ui/AppearancePanel'
 import { CanvasContextMenu } from './ui/CanvasContextMenu'
 import { PathfinderPanel } from './ui/PathfinderPanel'
+import { SymbolsPanel } from './ui/SymbolsPanel'
 import { TextPanel } from './ui/TextPanel'
 import { LayersPanel } from './ui/LayersPanel'
 import { MenuBar } from './ui/MenuBar'
@@ -61,6 +62,7 @@ export function App() {
             <TextPanel />
             <AlignPanel />
             <PathfinderPanel />
+            <SymbolsPanel />
           </div>
           <LayersPanel />
         </div>

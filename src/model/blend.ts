@@ -13,9 +13,12 @@
 
 import type { Vec2 } from '../geometry/vec2'
 import type { Ring, Regions } from '../geometry/boolean'
-import type { Paint, Style } from './types'
+import type { NodeId, Paint, SceneNode, Style } from './types'
 import { lerpColor } from './mesh'
 import { cloneStyle } from './nodes'
+import { nodeRegionsInDoc } from './booleanOps'
+import { getWorldTransform } from './document'
+import { applyToPoint, invert } from '../geometry/matrix'
 
 /** Vertices per interpolated ring (fidelity vs node weight). */
 export const BLEND_RING_SAMPLES = 64
@@ -164,4 +167,75 @@ export function interpolateStyle(a: Style, b: Style, t: number): Style {
   base.strokeWidth = a.strokeWidth + (b.strokeWidth - a.strokeWidth) * t
   delete base.widthProfile
   return base
+}
+
+// ---------------------------------------------------------------------------
+// LIVE blend: derived step geometry for a blend group
+// ---------------------------------------------------------------------------
+
+interface BlendOperand {
+  regions: Regions
+  first: Style
+  last: Style
+}
+
+/** DOC-space fill regions + first/last leaf styles of a blend endpoint subtree. */
+function collectEndpoint(nodes: Record<NodeId, SceneNode>, id: NodeId): BlendOperand | null {
+  const regions: Regions = []
+  let first: Style | null = null
+  let last: Style | null = null
+  const visit = (nid: NodeId): void => {
+    const node = nodes[nid]
+    if (!node || node.hidden) return
+    if (node.type === 'group') {
+      for (const child of node.children) visit(child)
+      return
+    }
+    if (node.type === 'text') return
+    const r = nodeRegionsInDoc(nodes, nid)
+    if (r.length === 0) return
+    regions.push(...r)
+    first ??= node.style
+    last = node.style
+  }
+  visit(id)
+  if (regions.length === 0 || !first || !last) return null
+  return { regions, first, last }
+}
+
+export interface BlendStep {
+  /** Step outline rings in the blend GROUP's local space. */
+  regions: Regions
+  style: Style
+}
+
+/**
+ * The derived steps of a LIVE blend group (group.blend set, exactly two
+ * children): interpolated outlines in the group's LOCAL space, bottom step
+ * first. Renderer and exporter both consume this, so canvas and SVG can
+ * never disagree. Returns [] when the group isn't a valid blend.
+ */
+export function blendStepGeometry(
+  nodes: Record<NodeId, SceneNode>,
+  groupId: NodeId,
+): BlendStep[] {
+  const group = nodes[groupId]
+  if (!group || group.type !== 'group' || !group.blend || group.children.length !== 2) return []
+  const a = collectEndpoint(nodes, group.children[0]!)
+  const b = collectEndpoint(nodes, group.children[1]!)
+  if (!a || !b) return []
+  const pairs = pairRings(a.regions, b.regions)
+  if (pairs.length === 0) return []
+
+  const toLocal = invert(getWorldTransform(nodes, groupId))
+  const n = Math.max(1, Math.round(group.blend.steps))
+  const steps: BlendStep[] = []
+  for (let i = 1; i <= n; i++) {
+    const t = i / (n + 1)
+    const regions: Regions = pairs.map((pair) => [
+      lerpRing(pair.a, pair.b, t).map((p) => applyToPoint(toLocal, p)),
+    ])
+    steps.push({ regions, style: interpolateStyle(a.first, b.last, t) })
+  }
+  return steps
 }

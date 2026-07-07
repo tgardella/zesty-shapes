@@ -36,6 +36,7 @@ import {
   cmdMeshSetPointColor,
 } from '../store/meshCommands'
 import { cmdCreateSymbolSet, cmdSprayStamp } from '../store/sprayCommands'
+import { cmdStampSymbol } from '../store/symbolCommands'
 import {
   cmdAddArtboard,
   cmdDeleteArtboard,
@@ -324,6 +325,7 @@ export class ToolManager {
         blobPaint: (trail, diameter, paint) => cmdBlobPaint(store, trail, diameter, paint),
         createSymbolSet: () => cmdCreateSymbolSet(store),
         sprayStamp: (sourceIds, stamp, groupId) => cmdSprayStamp(store, sourceIds, stamp, groupId),
+        stampSymbol: (symbolId, stamp, parentId) => cmdStampSymbol(store, symbolId, stamp, parentId),
         convertToMesh: (id) => cmdConvertToMesh(store, id),
         editTextNode: (nodeId) => {
           const node = g().document.nodes[nodeId]
@@ -355,6 +357,12 @@ export class ToolManager {
       meshEdit: {
         get: () => g().ui.meshEdit,
         set: (edit) => g().setMeshEdit(edit),
+      },
+      symbols: {
+        activeId: () => g().ui.activeSymbolId,
+      },
+      brush: {
+        preset: () => g().ui.brushPreset,
       },
       textEdit: {
         get: () => g().ui.textEdit,

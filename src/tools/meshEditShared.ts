@@ -8,7 +8,7 @@
 import { applyToPoint } from '../geometry/matrix'
 import type { Vec2 } from '../geometry/vec2'
 import type { MeshNode, NodeId, SceneNode } from '../model/types'
-import { meshIndex } from '../model/mesh'
+import { meshGridLines } from '../model/mesh'
 import { docToScreen, type ViewportState } from '../store/coords'
 import { worldTransform } from '../store/worldTransform'
 
@@ -45,17 +45,9 @@ function layoutFor(
   const world = worldTransform(nodes, node.id)
   const toScreen = (p: Vec2): Vec2 => docToScreen(viewport, applyToPoint(world, p))
   const pointsScreen = node.points.map((mp) => toScreen(mp.p))
-  const linesScreen: Vec2[][] = []
-  for (let r = 0; r <= node.rows; r++) {
-    const line: Vec2[] = []
-    for (let c = 0; c <= node.cols; c++) line.push(pointsScreen[meshIndex(node, r, c)]!)
-    linesScreen.push(line)
-  }
-  for (let c = 0; c <= node.cols; c++) {
-    const line: Vec2[] = []
-    for (let r = 0; r <= node.rows; r++) line.push(pointsScreen[meshIndex(node, r, c)]!)
-    linesScreen.push(line)
-  }
+  // Grid lines follow the CURVED surface (model/mesh.meshGridLines), so the
+  // annotator matches the painted mesh exactly.
+  const linesScreen = meshGridLines(node).map((line) => line.map(toScreen))
   return { nodeId: node.id, pointsScreen, linesScreen }
 }
 

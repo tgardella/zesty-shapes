@@ -5,9 +5,12 @@ import {
   meshBoundary,
   meshCellAt,
   meshFromShape,
+  meshGridLines,
   meshIndex,
   meshPointAt,
   meshQuads,
+  meshRowPoint,
+  meshSurfacePoint,
 } from './mesh'
 import { createRectNode, createEllipseNode } from './nodes'
 import { translate } from '../geometry/matrix'
@@ -75,6 +78,32 @@ describe('mesh geometry', () => {
     expect(boundary).toHaveLength(1)
     expect(boundary[0]!.closed).toBe(true)
     expect(boundary[0]!.anchors).toHaveLength(4) // 1x1 grid: the 4 corners
+  })
+})
+
+describe('curved surface (Catmull-Rom)', () => {
+  it('straight grids stay exactly straight', () => {
+    const mesh = rectMesh()
+    const p = meshRowPoint(mesh, 0, 0, 0.3)
+    expect(p.y).toBeCloseTo(0) // top edge of an unwarped rect mesh
+    expect(meshSurfacePoint(mesh, 0, 0, 0.5, 0.5).x).toBeCloseTo(50)
+  })
+
+  it('grid lines curve smoothly through a dragged point', () => {
+    const mesh = rectMesh()
+    meshAddDivision(mesh, { row: 0, col: 0, u: 0.5, v: 0.5 })
+    // Drag the center point up: the middle ROW line should bow, not kink.
+    const center = meshIndex(mesh, 1, 1)
+    mesh.points[center] = { p: { x: 50, y: 10 }, color: mesh.points[center]!.color }
+    // Between the left edge point (0,25) and the moved center (50,10), the
+    // curved line deviates from the straight chord (y = 25 - 0.3x) — the
+    // spline bows through the neighborhood instead of kinking.
+    const mid = meshRowPoint(mesh, 1, 0, 0.5)
+    const chordY = 25 - 0.3 * mid.x
+    expect(Math.abs(mid.y - chordY)).toBeGreaterThan(0.5) // curved, not straight
+    // And the line still passes exactly through the grid points.
+    expect(meshRowPoint(mesh, 1, 0, 1)).toEqual({ x: 50, y: 10 })
+    expect(meshGridLines(mesh).length).toBe(6) // 3 row + 3 column lines
   })
 })
 

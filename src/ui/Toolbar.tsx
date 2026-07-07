@@ -1,14 +1,20 @@
 /**
- * Left toolbar: one button per registered tool in two Illustrator-style
- * columns, active state from the store, shortcut in the tooltip. Which tools
- * show — and their order — comes from the toolbar config (Window > Customize
- * Toolbar…); hidden tools stay reachable through their shortcuts.
+ * Left toolbar: two Illustrator-style columns of tool SLOTS. Related tools
+ * share a slot (click+hold groups, ui/toolbarConfig.TOOL_GROUPS): the slot
+ * shows the group's last-used member with a corner triangle; click+HOLD (or
+ * right-click) opens a flyout to switch members. Which tools show — and
+ * their order — comes from the toolbar config (Window > Customize Toolbar…);
+ * hidden tools stay reachable through their shortcuts.
  */
 
+import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useEditor } from '../store/store'
 import type { ToolManager } from '../tools/ToolManager'
-import { displayOrder, useToolbarConfig } from './toolbarConfig'
+import { toolbarSlots, useToolbarConfig } from './toolbarConfig'
+
+/** Hold this long on a slot to open its flyout (ms). */
+const HOLD_MS = 250
 
 const ICONS: Record<string, ReactNode> = {
   selection: (
@@ -232,31 +238,127 @@ export function ToolIcon({ toolId, name }: { toolId: string; name: string }) {
   )
 }
 
+interface FlyoutState {
+  slotKey: string
+  /** Screen position of the slot button (flyout anchors beside it). */
+  top: number
+  left: number
+}
+
 export function Toolbar({ manager }: { manager: ToolManager }) {
   const activeToolId = useEditor((s) => s.tool.activeToolId)
   const order = useToolbarConfig((s) => s.order)
   const hidden = useToolbarConfig((s) => s.hidden)
+  const groupCurrent = useToolbarConfig((s) => s.groupCurrent)
+  const setGroupCurrent = useToolbarConfig((s) => s.setGroupCurrent)
+  const [flyout, setFlyout] = useState<FlyoutState | null>(null)
+  const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const suppressClick = useRef(false)
 
   const tools = manager.getTools()
   const byId = new Map(tools.map((t) => [t.id, t]))
-  const hiddenSet = new Set(hidden)
-  const visible = displayOrder({ order, hidden }, tools.map((t) => t.id))
-    .filter((id) => !hiddenSet.has(id))
-    .map((id) => byId.get(id)!)
+  const slots = toolbarSlots({ order, hidden, groupCurrent }, tools.map((t) => t.id))
+
+  // Activating a tool by SHORTCUT also fronts it in its group's slot.
+  useEffect(() => {
+    setGroupCurrent(activeToolId)
+  }, [activeToolId, setGroupCurrent])
+
+  const clearHold = (): void => {
+    if (holdTimer.current !== null) {
+      clearTimeout(holdTimer.current)
+      holdTimer.current = null
+    }
+  }
+
+  const openFlyout = (slotKey: string, button: HTMLElement): void => {
+    const rect = button.getBoundingClientRect()
+    setFlyout({ slotKey, top: rect.top, left: rect.right + 4 })
+  }
+
+  const pick = (toolId: string): void => {
+    manager.setActiveTool(toolId)
+    setGroupCurrent(toolId)
+    setFlyout(null)
+  }
+
+  const flyoutSlot = flyout ? slots.find((s) => s.key === flyout.slotKey) : undefined
 
   return (
     <div className="toolbar">
-      {visible.map((tool) => (
-        <button
-          key={tool.id}
-          type="button"
-          className={`tool-btn${tool.id === activeToolId ? ' active' : ''}`}
-          title={tool.shortcut ? `${tool.name} (${tool.shortcut.toUpperCase()})` : tool.name}
-          onClick={() => manager.setActiveTool(tool.id)}
-        >
-          <ToolIcon toolId={tool.id} name={tool.name} />
-        </button>
-      ))}
+      {slots.map((slot) => {
+        const current = byId.get(slot.currentId)!
+        const isActive = slot.toolIds.includes(activeToolId)
+        // The slot fronts the ACTIVE member while one is active.
+        const front = isActive ? byId.get(activeToolId)! : current
+        return (
+          <button
+            key={slot.key}
+            type="button"
+            className={`tool-btn${isActive ? ' active' : ''}`}
+            title={
+              front.shortcut ? `${front.name} (${front.shortcut.toUpperCase()})` : front.name
+            }
+            onPointerDown={(e) => {
+              if (slot.toolIds.length < 2) return
+              suppressClick.current = false
+              const button = e.currentTarget
+              clearHold()
+              holdTimer.current = setTimeout(() => {
+                holdTimer.current = null
+                suppressClick.current = true
+                openFlyout(slot.key, button)
+              }, HOLD_MS)
+            }}
+            onPointerUp={clearHold}
+            onPointerLeave={clearHold}
+            onClick={() => {
+              if (suppressClick.current) {
+                suppressClick.current = false
+                return
+              }
+              manager.setActiveTool(front.id)
+              setGroupCurrent(front.id)
+            }}
+            onContextMenu={(e) => {
+              if (slot.toolIds.length < 2) return
+              e.preventDefault()
+              clearHold()
+              openFlyout(slot.key, e.currentTarget)
+            }}
+          >
+            <ToolIcon toolId={front.id} name={front.name} />
+            {slot.toolIds.length > 1 && <span className="tool-flyout-mark" aria-hidden="true" />}
+          </button>
+        )
+      })}
+
+      {flyout && flyoutSlot && (
+        <>
+          <div className="menu-backdrop" onPointerDown={() => setFlyout(null)} />
+          <div className="tool-flyout" style={{ top: flyout.top, left: flyout.left }}>
+            {flyoutSlot.toolIds.map((id) => {
+              const tool = byId.get(id)!
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  className={id === activeToolId ? 'active' : ''}
+                  onClick={() => pick(id)}
+                  // pointerup also picks: press-hold-release-over-item flow.
+                  onPointerUp={() => pick(id)}
+                >
+                  <ToolIcon toolId={id} name={tool.name} />
+                  <span className="tool-flyout-name">{tool.name}</span>
+                  {tool.shortcut && (
+                    <span className="tool-flyout-shortcut">{tool.shortcut.toUpperCase()}</span>
+                  )}
+                </button>
+              )
+            })}
+          </div>
+        </>
+      )}
     </div>
   )
 }
