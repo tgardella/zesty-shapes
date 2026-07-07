@@ -56,12 +56,13 @@ abstract class SymbolismTool implements Tool {
 
   private apply(e: ToolPointerEvent, ctx: ToolContext, delta: Vec2): void {
     const radius = ctx.toolSize.get(this.id) / 2
+    const intensity = ctx.symbolism.intensity()
     ctx.commands.symbolismAdjust(this.targets, {
       kind: this.kind,
       center: e.docPoint,
       radius,
-      // Stain builds up per pass; a punchier rate makes a single stroke read.
-      strength: this.kind === 'stain' ? 0.6 : 0.3,
+      // Intensity drives the rate; transforms are gentler than the color tint.
+      strength: this.kind === 'stain' ? intensity : intensity * 0.6,
       delta,
       color: this.kind === 'stain' ? currentTint(ctx) : undefined,
       alt: e.modifiers.alt,

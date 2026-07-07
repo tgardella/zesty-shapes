@@ -57,21 +57,34 @@ function childCenterLocal(node: SceneNode, nodes: Record<NodeId, SceneNode>): Ve
   return applyToPoint(node.transform, c)
 }
 
-/** Tint every solid fill in a subtree toward `color` by `amount` (in the draft). */
+/**
+ * Tint every solid fill in a subtree toward `color` by `amount` (in the draft).
+ * `reduce` (Alt) instead lerps the fill back toward its captured pre-stain color
+ * (style.stainBase), revealing the original — Illustrator's Alt-stain.
+ */
 function stainSubtree(
   nodes: Record<NodeId, SceneNode>,
   id: NodeId,
   color: RGBA,
   amount: number,
+  reduce: boolean,
 ): void {
   const node = nodes[id]
   if (!node) return
   if (node.type === 'group') {
-    for (const child of node.children) stainSubtree(nodes, child, color, amount)
+    for (const child of node.children) stainSubtree(nodes, child, color, amount, reduce)
     return
   }
   const fill = node.style.fill
-  if (fill && fill.type === 'solid') fill.color = lerpColor(fill.color, color, amount)
+  if (!fill || fill.type !== 'solid') return
+  if (reduce) {
+    const base = node.style.stainBase
+    if (base) fill.color = lerpColor(fill.color, base, amount)
+    return
+  }
+  // Remember the pristine color the first time we tint it, so Alt can restore it.
+  if (!node.style.stainBase) node.style.stainBase = { ...fill.color }
+  fill.color = lerpColor(fill.color, color, amount)
 }
 
 /** Per-parent frame: doc->parent-local mapping + brush center/radius/delta there. */
@@ -157,7 +170,8 @@ export function cmdSymbolismAdjust(
       const node = draft.nodes[job.id]
       if (!node) continue
       if (job.transform) node.transform = job.transform
-      if (job.stain !== undefined && params.color) stainSubtree(draft.nodes, job.id, params.color, job.stain)
+      if (job.stain !== undefined && params.color)
+        stainSubtree(draft.nodes, job.id, params.color, job.stain, params.alt)
     }
   })
   return true

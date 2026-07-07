@@ -106,6 +106,8 @@ export interface UiState {
   activeSymbolId: string | null
   /** Active Paintbrush (B) brush from the brush library (model/brushLibrary). */
   activeBrushId: string
+  /** Symbolism adjuster intensity (0-1): how fast shift/size/stain apply. */
+  symbolismIntensity: number
 }
 
 /** Paintbrush stroke shapes: tapered ends, uniform, or angled-nib calligraphy. */
@@ -227,6 +229,7 @@ export interface EditorActions {
   setMeshEdit(edit: { nodeId: NodeId; pointIndex: number } | null): void
   setActiveSymbol(id: string | null): void
   setActiveBrush(id: string): void
+  setSymbolismIntensity(value: number): void
 
   /** Boolean-tool previews (Shape Builder face, Knife/Eraser trail); never undoable. */
   setFacePreview(region: Vec2[][] | null): void
@@ -304,6 +307,7 @@ export function createEditorStore(initialDocument?: Document): EditorStoreApi {
         savedSelections: [],
         activeSymbolId: null,
         activeBrushId: DEFAULT_BRUSH_ID,
+        symbolismIntensity: 0.5,
       },
       history: emptyHistory(),
 
@@ -513,6 +517,11 @@ export function createEditorStore(initialDocument?: Document): EditorStoreApi {
       setActiveBrush(id) {
         const ui = get().ui
         if (ui.activeBrushId !== id) set({ ui: { ...ui, activeBrushId: id } })
+      },
+      setSymbolismIntensity(value) {
+        const ui = get().ui
+        const v = Math.max(0.05, Math.min(1, value))
+        if (ui.symbolismIntensity !== v) set({ ui: { ...ui, symbolismIntensity: v } })
       },
       setFacePreview(region) {
         const ui = get().ui
