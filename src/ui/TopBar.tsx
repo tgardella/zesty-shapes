@@ -1,16 +1,11 @@
 /**
- * Top bar: zoom, grid display/units + snap, per-tool size, Open (import),
- * Convert to Path, and the Export dialog. Export is emitted DIRECTLY from
- * the model (documentToSVG and the exporters built on it), never from the
- * rendered DOM.
+ * Top bar: zoom, grid display/units + snap, and the per-tool size selector.
+ * File operations (Open / Export) and object commands moved into the menu
+ * bar (ui/MenuBar.tsx), like Illustrator.
  */
 
-import { useRef, useState } from 'react'
-import { importFile } from '../import/importFiles'
 import { editorStore, useEditor } from '../store/store'
-import { cmdConvertToPath } from '../store/commands'
 import { TOOL_SIZE_SPECS } from '../tools/toolSizes'
-import { ExportDialog } from './ExportDialog'
 
 /** Grid spacing presets in doc units (CSS px): 96/inch, ~37.8/cm. */
 const UNIT_SIZES = { inch: 96, cm: 96 / 2.54 } as const
@@ -24,8 +19,6 @@ function viewportCenter(): { x: number; y: number } {
   return { x: window.innerWidth / 2, y: window.innerHeight / 2 }
 }
 
-const CONVERTIBLE = new Set(['rect', 'ellipse', 'polygon', 'star', 'line'])
-
 export function TopBar() {
   const zoom = useEditor((s) => s.viewport.zoom)
   const snapToGrid = useEditor((s) => s.ui.snapToGrid)
@@ -33,11 +26,6 @@ export function TopBar() {
   const gridSize = useEditor((s) => s.ui.gridSize)
   const activeToolId = useEditor((s) => s.tool.activeToolId)
   const toolSize = useEditor((s) => s.ui.toolSizes[s.tool.activeToolId])
-  const canConvert = useEditor((s) =>
-    s.selection.some((id) => CONVERTIBLE.has(s.document.nodes[id]?.type ?? '')),
-  )
-  const [exporting, setExporting] = useState(false)
-  const fileRef = useRef<HTMLInputElement | null>(null)
 
   const zoomBy = (factor: number) => editorStore.getState().zoomAtPoint(viewportCenter(), factor)
   const sizeSpec = TOOL_SIZE_SPECS[activeToolId]
@@ -134,7 +122,7 @@ export function TopBar() {
             type="range"
             min={sizeSpec.min}
             max={sizeSpec.max}
-            step={0.25}
+            step={sizeSpec.step ?? 0.25}
             value={toolSize ?? sizeSpec.default}
             onChange={(e) =>
               editorStore.getState().setToolSize(activeToolId, parseFloat(e.target.value))
@@ -145,7 +133,7 @@ export function TopBar() {
             type="number"
             min={sizeSpec.min}
             max={sizeSpec.max}
-            step={0.25}
+            step={sizeSpec.step ?? 0.25}
             value={toolSize ?? sizeSpec.default}
             onChange={(e) => {
               const v = parseFloat(e.target.value)
@@ -156,39 +144,6 @@ export function TopBar() {
       )}
 
       <div className="topbar-spacer" />
-
-      <input
-        ref={fileRef}
-        type="file"
-        accept=".svg,.png,.jpg,.jpeg,.pdf,image/svg+xml,image/png,image/jpeg,application/pdf"
-        multiple
-        style={{ display: 'none' }}
-        onChange={(e) => {
-          for (const f of Array.from(e.target.files ?? [])) void importFile(editorStore, f)
-          e.target.value = ''
-        }}
-      />
-      <button
-        type="button"
-        className="to-path-btn"
-        title="Open an SVG, PNG, JPG, or PDF as editable content"
-        onClick={() => fileRef.current?.click()}
-      >
-        Open…
-      </button>
-      <button
-        type="button"
-        className="to-path-btn"
-        disabled={!canConvert}
-        title="Convert selected shapes to editable paths (transform preserved)"
-        onClick={() => cmdConvertToPath(editorStore, editorStore.getState().selection)}
-      >
-        To Path
-      </button>
-      <button type="button" className="export-btn" onClick={() => setExporting(true)}>
-        Export…
-      </button>
-      {exporting && <ExportDialog onClose={() => setExporting(false)} />}
     </div>
   )
 }

@@ -1,11 +1,14 @@
 /**
- * Left toolbar: one button per registered tool, active state from the store,
- * shortcut in the tooltip.
+ * Left toolbar: one button per registered tool in two Illustrator-style
+ * columns, active state from the store, shortcut in the tooltip. Which tools
+ * show — and their order — comes from the toolbar config (Window > Customize
+ * Toolbar…); hidden tools stay reachable through their shortcuts.
  */
 
 import type { ReactNode } from 'react'
 import { useEditor } from '../store/store'
 import type { ToolManager } from '../tools/ToolManager'
+import { displayOrder, useToolbarConfig } from './toolbarConfig'
 
 const ICONS: Record<string, ReactNode> = {
   selection: (
@@ -172,6 +175,39 @@ const ICONS: Record<string, ReactNode> = {
       <path d="M7 11.5 C 6 13, 5.5 15, 6.5 17" strokeDasharray="2 1.6" />
     </g>
   ),
+  paintbrush: (
+    <g fill="none" stroke="currentColor" strokeWidth="1.4">
+      <path d="M11.5 3.5 L16.5 8.5 L9 16 C7.5 17.5 4.5 17 4 16.5 C5.5 15.5 4.5 13.5 5.5 12.5 Z" strokeLinejoin="round" />
+      <line x1="13" y1="5" x2="15" y2="7" />
+    </g>
+  ),
+  'blob-brush': (
+    <g fill="none" stroke="currentColor" strokeWidth="1.4">
+      <path d="M4 12 C 3 8, 7 5, 10 6.5 C 13 4.5, 17 7, 16 10.5 C 17.5 13, 15 16, 12 15 C 9.5 17, 5 15.5, 5.5 13 C 4.5 13, 4 12.5, 4 12 Z" strokeLinejoin="round" />
+    </g>
+  ),
+  blend: (
+    <g fill="none" stroke="currentColor">
+      <circle cx="5.5" cy="14" r="3" strokeWidth="1.5" />
+      <circle cx="14.5" cy="6" r="3" strokeWidth="1.5" />
+      <circle cx="10" cy="10" r="3" strokeWidth="1" opacity="0.55" strokeDasharray="2 1.6" />
+    </g>
+  ),
+  'gradient-mesh': (
+    <g fill="none" stroke="currentColor" strokeWidth="1.3">
+      <path d="M4 4 C 8 5.5, 12 5.5, 16 4 L16 16 C 12 14.5, 8 14.5, 4 16 Z" />
+      <path d="M10 4.9 L10 15.1 M4 10 C 8 11.2, 12 11.2, 16 10" strokeWidth="1" />
+      <circle cx="10" cy="10.6" r="1.4" fill="currentColor" stroke="none" />
+    </g>
+  ),
+  'symbol-sprayer': (
+    <g fill="none" stroke="currentColor" strokeWidth="1.4">
+      <path d="M6 17 L6 9 L10 9 L10 17 Z M7 9 L7 6.5 L9 6.5 L9 9" />
+      <circle cx="12.5" cy="5" r="0.9" fill="currentColor" stroke="none" />
+      <circle cx="15" cy="7" r="0.9" fill="currentColor" stroke="none" />
+      <circle cx="15.5" cy="3.5" r="0.9" fill="currentColor" stroke="none" />
+    </g>
+  ),
   artboard: (
     <g fill="none" stroke="currentColor" strokeWidth="1.5">
       <rect x="5" y="5" width="10" height="10" />
@@ -183,11 +219,34 @@ const ICONS: Record<string, ReactNode> = {
   ),
 }
 
+/** The tool's toolbar icon (shared with the Customize Toolbar dialog). */
+export function ToolIcon({ toolId, name }: { toolId: string; name: string }) {
+  return (
+    <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true">
+      {ICONS[toolId] ?? (
+        <text x="10" y="14" textAnchor="middle" fontSize="11" fill="currentColor">
+          {name.charAt(0)}
+        </text>
+      )}
+    </svg>
+  )
+}
+
 export function Toolbar({ manager }: { manager: ToolManager }) {
   const activeToolId = useEditor((s) => s.tool.activeToolId)
+  const order = useToolbarConfig((s) => s.order)
+  const hidden = useToolbarConfig((s) => s.hidden)
+
+  const tools = manager.getTools()
+  const byId = new Map(tools.map((t) => [t.id, t]))
+  const hiddenSet = new Set(hidden)
+  const visible = displayOrder({ order, hidden }, tools.map((t) => t.id))
+    .filter((id) => !hiddenSet.has(id))
+    .map((id) => byId.get(id)!)
+
   return (
     <div className="toolbar">
-      {manager.getTools().map((tool) => (
+      {visible.map((tool) => (
         <button
           key={tool.id}
           type="button"
@@ -195,13 +254,7 @@ export function Toolbar({ manager }: { manager: ToolManager }) {
           title={tool.shortcut ? `${tool.name} (${tool.shortcut.toUpperCase()})` : tool.name}
           onClick={() => manager.setActiveTool(tool.id)}
         >
-          <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true">
-            {ICONS[tool.id] ?? (
-              <text x="10" y="14" textAnchor="middle" fontSize="11" fill="currentColor">
-                {tool.name.charAt(0)}
-              </text>
-            )}
-          </svg>
+          <ToolIcon toolId={tool.id} name={tool.name} />
         </button>
       ))}
     </div>

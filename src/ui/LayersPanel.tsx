@@ -63,6 +63,13 @@ const TYPE_ICONS: Record<SceneNode['type'], ReactNode> = {
       <circle cx="6" cy="6.3" r="0.8" fill="currentColor" stroke="none" />
     </g>
   ),
+  mesh: (
+    <g fill="none" stroke="currentColor" strokeWidth="1.1">
+      <rect x="3" y="4" width="10" height="8" />
+      <line x1="8" y1="4" x2="8" y2="12" />
+      <line x1="3" y1="8" x2="13" y2="8" />
+    </g>
+  ),
 }
 
 function leafDescendants(nodes: Record<NodeId, SceneNode>, id: NodeId): NodeId[] {

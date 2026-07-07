@@ -7,7 +7,17 @@
 import type { Vec2 } from '../geometry/vec2'
 import type { Mat } from '../geometry/matrix'
 import type { BBox } from '../geometry/bbox'
-import type { Artboard, ArtboardId, Document, NodeId, SceneNode, Style } from '../model/types'
+import type {
+  Artboard,
+  ArtboardId,
+  Document,
+  NodeId,
+  RGBA,
+  SceneNode,
+  SolidPaint,
+  Style,
+} from '../model/types'
+import type { SprayStamp } from '../store/sprayCommands'
 import type { ViewportState } from '../store/coords'
 import type { AddNodeOptions, Appearance } from '../store/commands'
 import type { Face } from '../model/booleanOps'
@@ -114,6 +124,24 @@ export interface ToolContext {
     finishTextEdit(): void
     /** Switch to the Type tool and open the in-place editor on `nodeId`. */
     editTextNode(nodeId: NodeId): void
+    /** Blend two objects into a Blend group with N interpolated steps. */
+    blend(aId: NodeId, bId: NodeId, steps: number): NodeId | null
+    /** Blob Brush: filled blob from a trail, merged with same-colored blobs. */
+    blobPaint(trail: Vec2[], diameter: number, paint: SolidPaint): NodeId | null
+    /** Symbol Sprayer: the group stamps land in (one per spray gesture). */
+    createSymbolSet(): NodeId
+    /** Stamp one sprayed symbol instance into `groupId`. */
+    sprayStamp(sourceIds: NodeId[], stamp: SprayStamp, groupId: NodeId): NodeId[]
+    /** Shape/path -> 1x1 gradient mesh in place (id/transform preserved). */
+    convertToMesh(id: NodeId): boolean
+  }
+
+  /** Gradient Mesh point editing (Gradient Mesh tool, U). */
+  mesh: {
+    /** Add a row+column through the LOCAL point; returns the new point index or -1. */
+    addDivision(id: NodeId, localPoint: Vec2, color?: RGBA): number
+    movePoint(id: NodeId, index: number, localPoint: Vec2): void
+    setPointColor(id: NodeId, index: number, color: RGBA): void
   }
 
   /** Appearance UI state shared with the panel (never undoable). */
@@ -130,6 +158,12 @@ export interface ToolContext {
   widthEdit: {
     get(): NodeId | null
     set(id: NodeId | null): void
+  }
+
+  /** Gradient Mesh selected point (overlay highlight); never undoable. */
+  meshEdit: {
+    get(): { nodeId: NodeId; pointIndex: number } | null
+    set(edit: { nodeId: NodeId; pointIndex: number } | null): void
   }
 
   /** In-place text editing target (HTML overlay); never undoable. */

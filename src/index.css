@@ -14,22 +14,209 @@ body {
   -webkit-user-select: none;
 }
 
-.app {
+.app-shell {
   display: flex;
+  flex-direction: column;
   height: 100vh;
 }
 
-/* -- left toolbar -- */
+.app {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
 
-.toolbar {
-  width: 48px;
-  background: #1f2128;
+/* -- menu bar -- */
+
+.menubar {
+  display: flex;
+  align-items: stretch;
+  background: #1b1d23;
+  border-bottom: 1px solid #32353f;
+  padding: 0 6px;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 60;
+}
+
+.menubar-menu {
+  position: relative;
+}
+
+.menubar-label {
+  border: none;
+  background: transparent;
+  color: #c9cddb;
+  font-size: 12.5px;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+.menubar-label:hover,
+.menubar-label.open {
+  background: #2b2e38;
+  color: #ffffff;
+}
+
+.menubar-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  min-width: 210px;
+  background: #26282f;
+  border: 1px solid #3d414b;
+  border-radius: 0 0 8px 8px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  padding: 4px;
+  z-index: 61;
+}
+
+.menubar-dropdown button {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  gap: 4px;
+  border: none;
+  background: transparent;
+  color: #dfe1ea;
+  font-size: 12.5px;
+  text-align: left;
+  padding: 6px 8px;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.menubar-dropdown button:hover:not(:disabled) {
+  background: #3b82f6;
+  color: #ffffff;
+}
+
+.menubar-dropdown button:disabled {
+  color: #6a6f7d;
+  cursor: default;
+}
+
+.menubar-dropdown .menu-check {
+  width: 14px;
+  flex-shrink: 0;
+}
+
+.menubar-dropdown .menu-item-label {
+  flex: 1;
+}
+
+.menubar-dropdown .menu-shortcut {
+  color: #8b92a5;
+  font-size: 11px;
+  margin-left: 16px;
+}
+
+.menubar-dropdown button:hover:not(:disabled) .menu-shortcut {
+  color: #dbe6ff;
+}
+
+.menubar-backdrop {
+  z-index: 55;
+}
+
+/* -- customize toolbar dialog -- */
+
+.customize-toolbar-dialog {
+  max-height: 80vh;
   display: flex;
   flex-direction: column;
+}
+
+.customize-toolbar-dialog .dialog-hint {
+  color: #8b92a5;
+  font-size: 11.5px;
+  margin: 4px 0 10px;
+  max-width: 340px;
+}
+
+.customize-tool-list {
+  overflow-y: auto;
+  min-height: 0;
+  border: 1px solid #3d414b;
+  border-radius: 7px;
+  padding: 3px;
+  margin-bottom: 12px;
+}
+
+.customize-tool-row {
+  display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
+  padding: 3px 6px;
+  border-radius: 5px;
+}
+
+.customize-tool-row:hover {
+  background: #2b2e38;
+}
+
+.customize-tool-row.dragging {
+  opacity: 0.45;
+}
+
+.customize-tool-row .drag-grip {
+  color: #6a6f7d;
+  cursor: grab;
+  font-size: 11px;
+}
+
+.customize-tool-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  cursor: pointer;
+  color: #dfe1ea;
+  font-size: 12.5px;
+}
+
+.customize-tool-shortcut {
+  color: #8b92a5;
+  font-size: 11px;
+}
+
+.customize-tool-row .row-move {
+  border: none;
+  background: transparent;
+  color: #aab0c0;
+  cursor: pointer;
+  border-radius: 4px;
+  padding: 2px 5px;
+}
+
+.customize-tool-row .row-move:hover:not(:disabled) {
+  background: #3d414b;
+  color: #ffffff;
+}
+
+.customize-tool-row .row-move:disabled {
+  color: #565b68;
+  cursor: default;
+}
+
+.dialog-actions-spacer {
+  flex: 1;
+}
+
+/* -- left toolbar (two Illustrator-style columns) -- */
+
+.toolbar {
+  width: 80px;
+  background: #1f2128;
+  display: grid;
+  grid-template-columns: repeat(2, 36px);
+  grid-auto-rows: 36px;
+  justify-content: center;
+  align-content: start;
+  gap: 2px;
   padding: 8px 0;
   flex-shrink: 0;
+  overflow-y: auto;
 }
 
 .tool-btn {

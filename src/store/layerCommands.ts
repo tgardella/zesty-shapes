@@ -15,6 +15,7 @@ import {
   topLevelLayers,
 } from '../model/layers'
 import { cloneSubtrees, orderedSubtreeRoots } from '../model/clone'
+import { removeNode } from '../model/document'
 import { cmdInsertSubtrees, type SubtreePlacement } from './commands'
 import type { EditorStoreApi } from './store'
 
@@ -278,6 +279,24 @@ export function cmdNormalizeLayers(store: EditorStoreApi): void {
   store.getState().applyCommand('Organize Layers', (d) => {
     normalizeLayers(d)
   })
+}
+
+/**
+ * File > New: clear all artwork and start over with a fresh Layer 1. ONE
+ * undoable step (so an accidental New is a ⌘Z away from recovery).
+ */
+export function cmdNewDocument(store: EditorStoreApi): void {
+  store.getState().applyCommand(
+    'New Document',
+    (doc) => {
+      const root = doc.nodes[doc.root]
+      if (!root || root.type !== 'group') return
+      for (const id of [...root.children]) removeNode(doc, id)
+      normalizeLayers(doc) // recreates Layer 1
+    },
+    { selectAfter: [] },
+  )
+  store.getState().setActiveLayer(null)
 }
 
 /** Convenience: the layer that owns a node (for the panel's active-layer sync). */

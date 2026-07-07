@@ -13,6 +13,10 @@ export interface ToolSizeSpec {
   min: number
   max: number
   label: string
+  /** Hide the on-canvas size cursor circle (e.g. Blend "Steps" isn't a size). */
+  cursor?: boolean
+  /** Selector increment; default 0.25. Integer-valued sizes use 1. */
+  step?: number
 }
 
 export const TOOL_SIZE_SPECS: Record<string, ToolSizeSpec> = {
@@ -22,6 +26,10 @@ export const TOOL_SIZE_SPECS: Record<string, ToolSizeSpec> = {
   eraser: { default: 20, min: 2, max: 200, label: 'Size' },
   knife: { default: 6, min: 1, max: 64, label: 'Size' },
   scissors: { default: 12, min: 2, max: 64, label: 'Size' },
+  paintbrush: { default: 6, min: 0.5, max: 64, label: 'Size' },
+  'blob-brush': { default: 16, min: 1, max: 200, label: 'Size' },
+  'symbol-sprayer': { default: 80, min: 16, max: 400, label: 'Size' },
+  blend: { default: 5, min: 1, max: 24, label: 'Steps', cursor: false, step: 1 },
 }
 
 export function isSizeableTool(toolId: string): boolean {

@@ -23,6 +23,7 @@ import { subpathsToPathData } from '../geometry/pathData'
 import type { GradientPaint, NodeId, SceneNode } from '../model/types'
 import { toSubPaths } from '../model/nodes'
 import { imageDimFactor } from '../model/layers'
+import { meshQuads, meshSeamWidth } from '../model/mesh'
 import { regionsToSubPaths } from '../model/booleanOps'
 import { outlineStroke } from '../model/strokeOutline'
 import { layoutText } from '../model/textLayout'
@@ -116,7 +117,60 @@ function ShapeView({
       return <TextView node={node} transform={transform} opacity={opacity} style={style} />
     case 'image':
       return <ImageView node={node} transform={transform} opacity={opacity} style={style} />
+    case 'mesh':
+      return <MeshView node={node} transform={transform} opacity={opacity} style={style} />
   }
+}
+
+/**
+ * Gradient mesh: the smooth surface approximated by bilinear sub-quads
+ * (model/mesh.ts — the SAME quads the exporter emits), clipped to the source
+ * shape's outline. Each quad is stroked with its own color to hide
+ * antialiasing seams. An invisible outline path keeps the whole mesh
+ * clickable for the DOM hit-test even where quads were dragged outside it.
+ */
+function MeshView({
+  node,
+  transform,
+  opacity,
+  style,
+}: {
+  node: Extract<SceneNode, { type: 'mesh' }>
+  transform: string | undefined
+  opacity: number | undefined
+  style: CSSProperties | undefined
+}) {
+  const quads = meshQuads(node)
+  const seam = meshSeamWidth(node)
+  const outlineD = node.outline ? subpathsToPathData(node.outline) : ''
+  const clipId = `mesh-clip-${node.id}`
+  return (
+    <g data-node-id={node.id} transform={transform} opacity={opacity} style={style}>
+      {outlineD !== '' && (
+        <clipPath id={clipId}>
+          <path d={outlineD} />
+        </clipPath>
+      )}
+      <g clipPath={outlineD !== '' ? `url(#${clipId})` : undefined}>
+        {quads.map((q, i) => {
+          const c = q.color
+          const fill = `rgb(${Math.round(c.r)},${Math.round(c.g)},${Math.round(c.b)})`
+          return (
+            <polygon
+              key={i}
+              points={q.pts.map((p) => `${p.x},${p.y}`).join(' ')}
+              fill={fill}
+              fillOpacity={c.a < 1 ? c.a : undefined}
+              stroke={fill}
+              strokeOpacity={c.a < 1 ? c.a : undefined}
+              strokeWidth={seam}
+            />
+          )
+        })}
+      </g>
+      {outlineD !== '' && <path d={outlineD} fill="none" stroke="none" pointerEvents="fill" />}
+    </g>
+  )
 }
 
 /**

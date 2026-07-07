@@ -27,7 +27,8 @@ import {
   selectionHandleLayout,
 } from '../tools/handles'
 import { gradientAnnotatorLayout } from '../tools/gradientAnnotator'
-import { defaultToolSize, isSizeableTool } from '../tools/toolSizes'
+import { meshOverlayLayout } from '../tools/meshEditShared'
+import { defaultToolSize, isSizeableTool, TOOL_SIZE_SPECS } from '../tools/toolSizes'
 import { widthHandleLayout } from '../tools/widthEditShared'
 
 const ACCENT = '#3b82f6'
@@ -146,6 +147,7 @@ export function Overlay() {
       <PathEditOverlay />
       <PenPreviewView />
       <GradientAnnotatorView />
+      <MeshEditOverlay />
       <WidthEditOverlay />
       <FacePreviewView />
       <CutTrailView />
@@ -248,6 +250,7 @@ function SizeCursorView() {
   const sizes = useEditor((s) => s.ui.toolSizes)
   const viewport = useEditor((s) => s.viewport)
   if (!pointer || !isSizeableTool(activeToolId)) return null
+  if (TOOL_SIZE_SPECS[activeToolId]?.cursor === false) return null
   const size = sizes[activeToolId] ?? defaultToolSize(activeToolId)
   const c = docToScreen(viewport, pointer)
   const r = (size / 2) * viewport.zoom
@@ -411,6 +414,48 @@ function GradientAnnotatorView() {
         strokeWidth={1.2}
       />
       <circle cx={b.x} cy={b.y} r={4.5} fill="#ffffff" stroke={ACCENT} strokeWidth={1.2} />
+    </g>
+  )
+}
+
+/**
+ * Gradient Mesh grid (Gradient Mesh tool, U): the selected mesh's grid lines
+ * and points, with the tool's selected point highlighted. Layout comes from
+ * tools/meshEditShared — the SAME function the tool hit-tests against.
+ */
+function MeshEditOverlay() {
+  const activeToolId = useEditor((s) => s.tool.activeToolId)
+  const nodes = useEditor((s) => s.document.nodes)
+  const selection = useEditor((s) => s.selection)
+  const meshEdit = useEditor((s) => s.ui.meshEdit)
+  const viewport = useEditor((s) => s.viewport)
+  if (activeToolId !== 'gradient-mesh') return null
+  const layout = meshOverlayLayout(nodes, selection, viewport)
+  if (!layout) return null
+  const selectedIndex = meshEdit?.nodeId === layout.nodeId ? meshEdit.pointIndex : -1
+  return (
+    <g>
+      {layout.linesScreen.map((line, i) => (
+        <polyline
+          key={i}
+          points={line.map((p) => `${p.x},${p.y}`).join(' ')}
+          fill="none"
+          stroke={ACCENT}
+          strokeWidth={1}
+          opacity={0.75}
+        />
+      ))}
+      {layout.pointsScreen.map((p, i) => (
+        <circle
+          key={i}
+          cx={p.x}
+          cy={p.y}
+          r={i === selectedIndex ? 4.5 : 3.2}
+          fill={i === selectedIndex ? ACCENT : '#ffffff'}
+          stroke={ACCENT}
+          strokeWidth={1.2}
+        />
+      ))}
     </g>
   )
 }

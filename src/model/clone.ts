@@ -78,6 +78,9 @@ export function cloneSubtrees(
     if (clone.type === 'path') {
       clone.subpaths = cloneSubPathsWithNewIds(clone.subpaths)
     }
+    if (clone.type === 'mesh' && clone.outline) {
+      clone.outline = cloneSubPathsWithNewIds(clone.outline)
+    }
     return clone
   })
 
