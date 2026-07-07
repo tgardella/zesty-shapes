@@ -124,7 +124,8 @@ export function leafNodeAtPoint(doc: Document, point: Vec2, tolerance: number): 
       return inX && inY ? id : null
     }
     const subpaths = transformSubPaths(world, toSubPaths(node))
-    if (node.style.fill && pointInSubPaths(point, subpaths, node.style.fillRule)) return id
+    const filled = node.style.fill !== null || node.type === 'image'
+    if (filled && pointInSubPaths(point, subpaths, node.style.fillRule)) return id
     const band = tolerance + (node.style.stroke ? node.style.strokeWidth / 2 : 0)
     return distanceToSubPaths(point, subpaths) <= band ? id : null
   }

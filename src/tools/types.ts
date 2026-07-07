@@ -7,7 +7,7 @@
 import type { Vec2 } from '../geometry/vec2'
 import type { Mat } from '../geometry/matrix'
 import type { BBox } from '../geometry/bbox'
-import type { Document, NodeId, SceneNode, Style } from '../model/types'
+import type { Artboard, ArtboardId, Document, NodeId, SceneNode, Style } from '../model/types'
 import type { ViewportState } from '../store/coords'
 import type { AddNodeOptions, Appearance } from '../store/commands'
 import type { Face } from '../model/booleanOps'
@@ -107,7 +107,7 @@ export interface ToolContext {
       mode: 'merge' | 'delete',
     ): NodeId[]
     /** Freehand knife cut: split intersected targets into separate pieces. */
-    knife(trail: Vec2[], ids?: NodeId[]): NodeId[]
+    knife(trail: Vec2[], ids?: NodeId[], width?: number): NodeId[]
     /** Freehand eraser: subtract a blob of `radius` from targets. */
     erase(trail: Vec2[], radius: number, ids?: NodeId[]): NodeId[]
     /** Commit (or roll back, when emptied) the in-place text edit session. */
@@ -163,6 +163,23 @@ export interface ToolContext {
     topNodeAt(target: EventTarget | null): NodeId | null
     /** Geometric marquee test against the current scope's children. */
     nodesInRect(rect: BBox, mode?: 'intersect' | 'contain'): NodeId[]
+  }
+
+  /** Artboard tool surface (Shift+O). Mutations are undoable commands. */
+  artboard: {
+    /** Active artboard id (UI state, like selection — never undoable). */
+    active(): ArtboardId | null
+    setActive(id: ArtboardId | null): void
+    add(rect: { x: number; y: number; w: number; h: number }): ArtboardId
+    update(id: ArtboardId, label: string, mutate: (ab: Artboard) => void): void
+    duplicate(id: ArtboardId): ArtboardId | null
+    remove(id: ArtboardId): boolean
+  }
+
+  /** Per-tool size (doc units) for the size-cursor tools. */
+  toolSize: {
+    get(toolId: string): number
+    set(toolId: string, size: number): void
   }
 }
 

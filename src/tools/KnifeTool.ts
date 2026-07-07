@@ -46,7 +46,12 @@ export class KnifeTool implements Tool {
 
   protected apply(trail: Vec2[], ctx: ToolContext): void {
     const selection = ctx.getSelection()
-    ctx.commands.knife(trail, selection.length > 0 ? selection : undefined)
+    ctx.commands.knife(
+      trail,
+      selection.length > 0 ? selection : undefined,
+      // Size selector = kerf width; scaled down so the default feels like a blade.
+      ctx.toolSize.get('knife') / 12,
+    )
   }
 
   onCancel(ctx: ToolContext): void {

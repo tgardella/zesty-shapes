@@ -43,7 +43,7 @@ export class EraserTool implements Tool {
     // A bare click still erases a dot: give the blade two nearby points.
     if (trail.length < 2) trail = [trail[0]!, { x: e.docPoint.x + 0.1, y: e.docPoint.y }]
     const selection = ctx.getSelection()
-    ctx.commands.erase(trail, ERASER_RADIUS, selection.length > 0 ? selection : undefined)
+    ctx.commands.erase(trail, ctx.toolSize.get('eraser') / 2, selection.length > 0 ? selection : undefined)
   }
 
   onCancel(ctx: ToolContext): void {

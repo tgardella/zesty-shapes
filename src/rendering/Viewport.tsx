@@ -8,6 +8,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent } from 'react'
 import type { Vec2 } from '../geometry/vec2'
+import { screenToDoc } from '../store/coords'
 import { editorStore, useEditor } from '../store/store'
 import type { ToolManager } from '../tools/ToolManager'
 import { DocumentSvg } from './DocumentSvg'
@@ -54,6 +55,9 @@ export function Viewport({ manager }: { manager: ToolManager }) {
 
   const onPointerMove = (e: ReactPointerEvent<HTMLDivElement>) => {
     const screenPoint = toScreen(e)
+    // Track the doc-space pointer for the tool-size cursor circle.
+    const state = editorStore.getState()
+    state.setPointer(screenToDoc(state.viewport, screenPoint))
     const pan = panRef.current
     if (pan && e.pointerId === pan.pointerId) {
       editorStore.getState().setViewport({
@@ -117,6 +121,7 @@ export function Viewport({ manager }: { manager: ToolManager }) {
       onDoubleClick={(e) => {
         if (e.button === 0) manager.doubleClick(e.nativeEvent, toScreen(e))
       }}
+      onPointerLeave={() => editorStore.getState().setPointer(null)}
       onMouseDown={(e) => {
         if (e.button === 1) e.preventDefault() // block middle-click autoscroll
       }}

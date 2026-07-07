@@ -35,6 +35,13 @@ const TYPE_ICONS: Record<SceneNode['type'], ReactNode> = {
   line: <line x1="3.5" y1="12.5" x2="12.5" y2="3.5" stroke="currentColor" strokeWidth="1.4" />,
   path: <path d="M3 12 C5 4 11 12 13 4" fill="none" stroke="currentColor" strokeWidth="1.3" />,
   text: <text x="8" y="12" textAnchor="middle" fontSize="11" fill="currentColor">T</text>,
+  image: (
+    <g fill="none" stroke="currentColor" strokeWidth="1.2">
+      <rect x="3" y="4" width="10" height="8" />
+      <path d="M4 10.5 L7 7.5 L9 9.5 L10.5 8 L12 9.5" />
+      <circle cx="6" cy="6.3" r="0.8" fill="currentColor" stroke="none" />
+    </g>
+  ),
 }
 
 export function LayersPanel() {

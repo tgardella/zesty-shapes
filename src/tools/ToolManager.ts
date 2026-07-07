@@ -27,7 +27,14 @@ import {
   cmdUpdateNode,
 } from '../store/commands'
 import { cmdErase, cmdKnife, cmdShapeBuilder } from '../store/booleanCommands'
+import {
+  cmdAddArtboard,
+  cmdDeleteArtboard,
+  cmdDuplicateArtboard,
+  cmdUpdateArtboard,
+} from '../store/artboardCommands'
 import { finishTextEdit } from '../store/textCommands'
+import { defaultToolSize } from './toolSizes'
 import { copySelection, cutSelection, pasteClipboard } from '../store/clipboard'
 import { effectiveScopeId, type EditorStoreApi } from '../store/store'
 import { worldTransform } from '../store/worldTransform'
@@ -296,7 +303,7 @@ export class ToolManager {
           cmdApplyAppearance(store, ids, appearance, label),
         shapeBuilder: (sourceIds, faces, picked, mode) =>
           cmdShapeBuilder(store, sourceIds, faces, picked, mode),
-        knife: (trail, ids) => cmdKnife(store, trail, ids),
+        knife: (trail, ids, width) => cmdKnife(store, trail, ids, width),
         erase: (trail, radius, ids) => cmdErase(store, trail, radius, ids),
         finishTextEdit: () => finishTextEdit(store),
         editTextNode: (nodeId) => {
@@ -342,6 +349,18 @@ export class ToolManager {
           topNodeIdFromTarget(g().document, target, effectiveScopeId(g())),
         nodesInRect: (rect, mode) =>
           nodesInDocRect(g().document, rect, { scopeId: effectiveScopeId(g()), mode }),
+      },
+      artboard: {
+        active: () => g().ui.activeArtboardId,
+        setActive: (id) => g().setActiveArtboard(id),
+        add: (rect) => cmdAddArtboard(store, rect),
+        update: (id, label, mutate) => cmdUpdateArtboard(store, id, label, mutate),
+        duplicate: (id) => cmdDuplicateArtboard(store, id),
+        remove: (id) => cmdDeleteArtboard(store, id),
+      },
+      toolSize: {
+        get: (toolId) => g().ui.toolSizes[toolId] ?? defaultToolSize(toolId),
+        set: (toolId, size) => g().setToolSize(toolId, size),
       },
     }
   }

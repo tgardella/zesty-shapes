@@ -137,6 +137,7 @@ export type NodeType =
   | 'path'
   | 'group'
   | 'text'
+  | 'image'
 
 export interface BaseNode {
   id: NodeId
@@ -256,6 +257,18 @@ export interface TextNode extends BaseNode {
   pathStartOffset?: number
 }
 
+/**
+ * Placed raster image (PNG/JPG import, rasterized PDF pages). LOCAL geometry
+ * spans (0,0)..(w,h); the transform is the sole placement mechanism. `href`
+ * is a data: URL so documents stay self-contained across JSON round-trips.
+ */
+export interface ImageNode extends BaseNode {
+  type: 'image'
+  href: string
+  w: number
+  h: number
+}
+
 export type ShapeNode = RectNode | EllipseNode | PolygonNode | StarNode | LineNode
 
 export type SceneNode =
@@ -267,6 +280,7 @@ export type SceneNode =
   | PathNode
   | GroupNode
   | TextNode
+  | ImageNode
 
 // ---------------------------------------------------------------------------
 // Document

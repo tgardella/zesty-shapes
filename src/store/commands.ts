@@ -584,7 +584,14 @@ export function cmdConvertToPath(store: EditorStoreApi, ids: NodeId[]): NodeId[]
   store.getState().applyCommand('Convert to Path', (draft) => {
     for (const id of convertible) {
       const node = draft.nodes[id]
-      if (!node || node.type === 'group' || node.type === 'text' || node.type === 'path') continue
+      if (
+        !node ||
+        node.type === 'group' ||
+        node.type === 'text' ||
+        node.type === 'path' ||
+        node.type === 'image'
+      )
+        continue
       // Snapshot to plain JSON first — convertToPath must not carry draft
       // references from the node being replaced into its replacement.
       const plain = JSON.parse(JSON.stringify(node)) as typeof node

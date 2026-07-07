@@ -356,11 +356,17 @@ const KNIFE_WIDTH = 0.15
 /**
  * Freehand knife cut: every intersected target splits into SEPARATE closed
  * paths (one node per disjoint piece). Targets = `ids` if given, else all
- * cuttable leaves. Returns new node ids.
+ * cuttable leaves. Returns new node ids. `width` (doc units) is the kerf the
+ * blade removes — the tool-size selector drives it (hairline by default).
  */
-export function cmdKnife(store: EditorStoreApi, trail: Vec2[], ids?: NodeId[]): NodeId[] {
+export function cmdKnife(
+  store: EditorStoreApi,
+  trail: Vec2[],
+  ids?: NodeId[],
+  width: number = KNIFE_WIDTH,
+): NodeId[] {
   const doc = store.getState().document
-  const blade = bladeRegions(trail, KNIFE_WIDTH)
+  const blade = bladeRegions(trail, Math.max(KNIFE_WIDTH, width))
   if (blade.length === 0) return []
   const targets = collectOperands(
     doc,

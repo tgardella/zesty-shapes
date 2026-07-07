@@ -18,6 +18,7 @@ import type {
   BaseNode,
   EllipseNode,
   GroupNode,
+  ImageNode,
   LineNode,
   PathNode,
   PolygonNode,
@@ -214,13 +215,37 @@ export function createTextNode(params: TextParams, overrides: BaseOverrides = {}
   return node
 }
 
+/** Placed raster image: local geometry (0,0)..(w,h), fill/stroke unused. */
+export function createImageNode(
+  params: { href: string; w: number; h: number },
+  overrides: BaseOverrides = {},
+): ImageNode {
+  const node: ImageNode = {
+    ...base('image', 'Image', overrides),
+    type: 'image',
+    href: params.href,
+    w: params.w,
+    h: params.h,
+  }
+  // Images paint their own pixels; no fill/stroke unless explicitly supplied.
+  if (!overrides.style) {
+    node.style.fill = null
+    node.style.stroke = null
+  }
+  return node
+}
+
 /**
  * LOCAL-space subpaths for any drawable (non-group, non-text) node.
  * Parametric shapes derive fresh subpaths from their params; PathNodes return
  * their stored subpaths as-is (same references — copy before mutating).
+ * Images contribute their frame rectangle (selection outline / hit-testing /
+ * type-on-path source).
  */
-export function toSubPaths(node: ShapeNode | PathNode): SubPath[] {
+export function toSubPaths(node: ShapeNode | PathNode | ImageNode): SubPath[] {
   switch (node.type) {
+    case 'image':
+      return rectToPath(0, 0, node.w, node.h, 0, 0)
     case 'rect':
       return rectToPath(node.x, node.y, node.w, node.h, node.rx, node.ry)
     case 'ellipse':

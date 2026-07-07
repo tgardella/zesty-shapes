@@ -172,6 +172,15 @@ const ICONS: Record<string, ReactNode> = {
       <path d="M7 11.5 C 6 13, 5.5 15, 6.5 17" strokeDasharray="2 1.6" />
     </g>
   ),
+  artboard: (
+    <g fill="none" stroke="currentColor" strokeWidth="1.5">
+      <rect x="5" y="5" width="10" height="10" />
+      <line x1="2" y1="5" x2="18" y2="5" strokeWidth="1" opacity="0.65" />
+      <line x1="2" y1="15" x2="18" y2="15" strokeWidth="1" opacity="0.65" />
+      <line x1="5" y1="2" x2="5" y2="18" strokeWidth="1" opacity="0.65" />
+      <line x1="15" y1="2" x2="15" y2="18" strokeWidth="1" opacity="0.65" />
+    </g>
+  ),
 }
 
 export function Toolbar({ manager }: { manager: ToolManager }) {
