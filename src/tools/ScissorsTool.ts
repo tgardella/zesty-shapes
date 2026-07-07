@@ -27,13 +27,15 @@ export class ScissorsTool implements Tool {
 
   onPointerDown(e: ToolPointerEvent, ctx: ToolContext): void {
     const doc = ctx.getDocument()
+    // The size selector sets the snap tolerance band (doc-space diameter).
+    const tolPx = Math.max(4, (ctx.toolSize.get('scissors') / 2) * ctx.getViewport().zoom)
 
     // Resolve the path under the cursor (selected target first, then leaf).
     let target = pathNodeOf(doc.nodes, ctx.pathEdit.get()?.nodeId)
     const hitOnTarget =
       target &&
-      (anchorAtScreenPoint(doc.nodes, target, ctx.getViewport(), e.screenPoint) !== null ||
-        segmentAtScreenPoint(doc.nodes, target, ctx.getViewport(), e.screenPoint) !== null)
+      (anchorAtScreenPoint(doc.nodes, target, ctx.getViewport(), e.screenPoint, tolPx) !== null ||
+        segmentAtScreenPoint(doc.nodes, target, ctx.getViewport(), e.screenPoint, tolPx) !== null)
     if (!hitOnTarget) {
       const leafId = leafNodeIdFromTarget(doc, e.domTarget)
       if (!leafId) return
@@ -52,10 +54,10 @@ export class ScissorsTool implements Tool {
     const fresh = pathNodeOf(nodes, targetId)
     if (!fresh) return
 
-    const anchorHit = anchorAtScreenPoint(nodes, fresh, ctx.getViewport(), e.screenPoint)
+    const anchorHit = anchorAtScreenPoint(nodes, fresh, ctx.getViewport(), e.screenPoint, tolPx)
     const segHit = anchorHit
       ? null
-      : segmentAtScreenPoint(nodes, fresh, ctx.getViewport(), e.screenPoint)
+      : segmentAtScreenPoint(nodes, fresh, ctx.getViewport(), e.screenPoint, tolPx)
     if (!anchorHit && !segHit) return
 
     ctx.commands.updateNode(targetId, 'Cut Path', (node) => {

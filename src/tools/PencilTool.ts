@@ -39,6 +39,7 @@ export class PencilTool implements Tool {
       this.lastScreen = e.screenPoint
       const style = cloneStyle(ctx.style.current())
       style.fill = null
+      style.strokeWidth = ctx.toolSize.get('pencil')
       const node = createPathNode(
         [createSubPath([createAnchor({ x: 0, y: 0 })], false)],
         { transform: translate(this.origin.x, this.origin.y), style },

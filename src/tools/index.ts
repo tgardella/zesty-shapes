@@ -4,6 +4,7 @@
  */
 
 import type { EditorStoreApi } from '../store/store'
+import { ArtboardTool } from './ArtboardTool'
 import { CurvatureTool } from './CurvatureTool'
 import { DirectSelectionTool } from './DirectSelectionTool'
 import { EllipseTool } from './EllipseTool'
@@ -54,6 +55,7 @@ export function createToolManager(store: EditorStoreApi): ToolManager {
   manager.register(new VerticalTypeTool()) //      toolbar-selected
   manager.register(new MagicWandTool()) //         Y
   manager.register(new LassoTool()) //             Q
+  manager.register(new ArtboardTool()) //          Shift+O
   return manager
 }
 

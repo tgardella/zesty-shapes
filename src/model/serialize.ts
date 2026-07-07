@@ -136,6 +136,12 @@ function nodeToSVG(doc: Document, id: NodeId, reg: DefsRegistry): string {
     return `<g id="${escapeXml(node.id)}"${commonAttrs(node)}>${inner}</g>`
   }
   if (node.type === 'text') return textToSVG(node, reg)
+  if (node.type === 'image') {
+    return (
+      `<image id="${escapeXml(node.id)}"${commonAttrs(node)} width="${node.w}" ` +
+      `height="${node.h}" preserveAspectRatio="none" href="${escapeXml(node.href)}"/>`
+    )
+  }
   if (hasWidthProfile(node.style)) return variableWidthToSVG(node, reg)
   const d = subpathsToPathData(toSubPaths(node))
   if (d === '') return ''
@@ -211,15 +217,49 @@ function variableWidthToSVG(
   return `<g id="${escapeXml(node.id)}"${commonAttrs(node)}>${inner}</g>`
 }
 
-/**
- * Emit the whole document as a standalone SVG string. The viewBox is the
- * union of all artboards (per-artboard export arrives in a later phase).
- */
-export function documentToSVG(doc: Document): string {
+export interface SvgExportOptions {
+  /** Doc-space viewBox override (an artboard's rect, a selection's bounds). */
+  bounds?: BBox
+  /**
+   * Export only these nodes (any nesting depth). Each is emitted at its WORLD
+   * placement so nested selections land exactly where they render. Default:
+   * the whole scene.
+   */
+  ids?: NodeId[]
+  /** Solid background rect under the content (JPG export needs one). */
+  background?: string
+}
+
+/** Union of the document's artboard rects (the default whole-document view). */
+export function artboardsBounds(doc: Document): BBox | null {
   let view: BBox | null = null
   for (const ab of doc.artboards) {
     view = unionBBox(view, { minX: ab.x, minY: ab.y, maxX: ab.x + ab.w, maxY: ab.y + ab.h })
   }
+  return view
+}
+
+/** World-space bounds of a set of nodes (selection export). */
+export function nodesBounds(doc: Document, ids: NodeId[]): BBox | null {
+  let out: BBox | null = null
+  for (const id of ids) {
+    const node = doc.nodes[id]
+    if (!node) continue
+    const local = localBBoxOfNode(node, doc.nodes)
+    if (!local) continue
+    out = unionBBox(out, transformBBox(getWorldTransform(doc.nodes, id), local))
+  }
+  return out
+}
+
+/**
+ * Emit the document (or a subset/region of it) as a standalone SVG string.
+ * The default viewBox is the union of all artboards.
+ */
+export function documentToSVG(doc: Document, opts: SvgExportOptions = {}): string {
+  let view: BBox | null = opts.bounds ?? null
+  if (!view && opts.ids) view = nodesBounds(doc, opts.ids)
+  if (!view) view = artboardsBounds(doc)
   // Fall back to content bounds if there are somehow no artboards.
   if (!view) {
     const rootNode = doc.nodes[doc.root]
@@ -234,16 +274,34 @@ export function documentToSVG(doc: Document): string {
 
   const reg = createDefsRegistry()
   const root = doc.nodes[doc.root]
-  const content =
-    root && root.type === 'group'
-      ? root.children.map((id) => nodeToSVG(doc, id, reg)).join('')
-      : ''
+  let content = ''
+  if (opts.ids) {
+    // Subset export: each node at its WORLD placement — wrap in the parent's
+    // world transform so the node's own transform composes exactly as on
+    // canvas, regardless of nesting.
+    for (const id of opts.ids) {
+      const node = doc.nodes[id]
+      if (!node || !node.parent) continue
+      const parentWorld = getWorldTransform(doc.nodes, node.parent)
+      const inner = nodeToSVG(doc, id, reg)
+      if (inner === '') continue
+      content += isIdentity(parentWorld)
+        ? inner
+        : `<g transform="${toSvgTransform(parentWorld)}">${inner}</g>`
+    }
+  } else if (root && root.type === 'group') {
+    content = root.children.map((id) => nodeToSVG(doc, id, reg)).join('')
+  }
   const defs = defsToSVG(reg) // after content walk so all paints are acquired
+  const bg = opts.background
+    ? `<rect x="${view.minX}" y="${view.minY}" width="${w}" height="${h}" fill="${opts.background}"/>`
+    : ''
 
   return (
     `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" ` +
     `viewBox="${view.minX} ${view.minY} ${w} ${h}">` +
     defs +
+    bg +
     content +
     `</svg>`
   )

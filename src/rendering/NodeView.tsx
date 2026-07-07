@@ -113,6 +113,19 @@ function ShapeView({
       )
     case 'text':
       return <TextView node={node} transform={transform} opacity={opacity} style={style} />
+    case 'image':
+      return (
+        <image
+          data-node-id={node.id}
+          transform={transform}
+          opacity={opacity}
+          style={style}
+          href={node.href}
+          width={node.w}
+          height={node.h}
+          preserveAspectRatio="none"
+        />
+      )
   }
 }
 

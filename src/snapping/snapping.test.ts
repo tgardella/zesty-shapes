@@ -8,20 +8,13 @@ const grid10: SnapSettings = { snapToGrid: true, gridSize: 10 }
 const free: SnapQuery = { zoom: 1, anchor: null, constrainAngle: false }
 
 describe('gridSnapper', () => {
-  it('snaps each axis independently within the screen-px threshold', () => {
+  it('LOCKS every point to the nearest grid intersection', () => {
     const r = gridSnapper.snap({ x: 12.4, y: 99 }, free, grid10)
     expect(r).not.toBeNull()
     expect(r!.point).toEqual({ x: 10, y: 100 })
-  })
-
-  it('threshold is screen pixels divided by zoom', () => {
-    // At zoom 10 the pull radius is 0.6 doc units: 12.4 and 99 are both too far.
-    const r = gridSnapper.snap({ x: 12.4, y: 99 }, { ...free, zoom: 10 }, grid10)
-    expect(r).toBeNull()
-    // 10.05 is within 0.6 of the line at 10.
-    const r2 = gridSnapper.snap({ x: 10.05, y: 55 }, { ...free, zoom: 10 }, grid10)
-    expect(r2!.point.x).toBe(10)
-    expect(r2!.point.y).toBe(55)
+    // Even far from a line: 26 -> 30, 44 -> 40 (Illustrator lock semantics).
+    const far = gridSnapper.snap({ x: 26, y: 44 }, free, grid10)
+    expect(far!.point).toEqual({ x: 30, y: 40 })
   })
 
   it('does nothing when snap-to-grid is off', () => {

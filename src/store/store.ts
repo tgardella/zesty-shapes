@@ -84,6 +84,22 @@ export interface UiState {
   textEdit: { nodeId: NodeId } | null
   /** Lasso (Q) freehand trail (DOC space) while dragging. */
   lasso: Vec2[] | null
+  /** Artboard tool target (like selection: never undoable). */
+  activeArtboardId: string | null
+  /** Display grid + units. Snapping reads `gridSize` (doc units = CSS px). */
+  grid: GridSettings
+  /** Per-tool size (doc units): eraser diameter, pencil stroke width, ... */
+  toolSizes: Record<string, number>
+  /** Pointer position in DOC space while over the canvas (size cursor). */
+  pointer: Vec2 | null
+}
+
+export interface GridSettings {
+  /** Draw the grid (lines or dots) under the scene. */
+  show: boolean
+  style: 'lines' | 'dots'
+  /** Preset spacing: 1in = 96, 1cm ≈ 37.795; 'custom' uses `gridSize` as-is. */
+  unit: 'inch' | 'cm' | 'custom'
 }
 
 export interface EditorState {
@@ -161,6 +177,16 @@ export interface EditorActions {
   /** In-place text editing target + lasso trail; never undoable. */
   setTextEdit(edit: { nodeId: NodeId } | null): void
   setLasso(trail: Vec2[] | null): void
+
+  /** Artboard tool target; never undoable. */
+  setActiveArtboard(id: string | null): void
+  /** Grid settings (display + spacing); never undoable. */
+  setGrid(grid: Partial<GridSettings>): void
+  setGridSize(size: number): void
+  /** Per-tool size (doc units); never undoable. */
+  setToolSize(toolId: string, size: number): void
+  /** Pointer doc position for the size cursor; null when off-canvas. */
+  setPointer(p: Vec2 | null): void
 }
 
 export type EditorStore = EditorState & EditorActions
@@ -203,6 +229,10 @@ export function createEditorStore(initialDocument?: Document): EditorStoreApi {
         cutTrail: null,
         textEdit: null,
         lasso: null,
+        activeArtboardId: null,
+        grid: { show: false, style: 'lines', unit: 'custom' },
+        toolSizes: {},
+        pointer: null,
       },
       history: emptyHistory(),
 
@@ -415,6 +445,29 @@ export function createEditorStore(initialDocument?: Document): EditorStoreApi {
         const ui = get().ui
         if (ui.lasso === trail || (ui.lasso === null && trail === null)) return
         set({ ui: { ...ui, lasso: trail } })
+      },
+      setActiveArtboard(id) {
+        const ui = get().ui
+        if (ui.activeArtboardId !== id) set({ ui: { ...ui, activeArtboardId: id } })
+      },
+      setGrid(grid) {
+        const ui = get().ui
+        set({ ui: { ...ui, grid: { ...ui.grid, ...grid } } })
+      },
+      setGridSize(size) {
+        const ui = get().ui
+        if (size > 0 && ui.gridSize !== size) set({ ui: { ...ui, gridSize: size } })
+      },
+      setToolSize(toolId, size) {
+        const ui = get().ui
+        if (size > 0 && ui.toolSizes[toolId] !== size) {
+          set({ ui: { ...ui, toolSizes: { ...ui.toolSizes, [toolId]: size } } })
+        }
+      },
+      setPointer(p) {
+        const ui = get().ui
+        if (ui.pointer === p || (ui.pointer === null && p === null)) return
+        set({ ui: { ...ui, pointer: p } })
       },
     }
   })

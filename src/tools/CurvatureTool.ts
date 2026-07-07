@@ -126,6 +126,7 @@ export class CurvatureTool implements Tool {
     // Empty canvas: start a new curve.
     const style = cloneStyle(ctx.style.current())
     style.fill = null
+    style.strokeWidth = ctx.toolSize.get('curvature')
     const anchor = createAnchor({ x: 0, y: 0 }, { type: 'smooth' })
     const node = createPathNode([createSubPath([anchor], false)], {
       transform: translate(e.snappedPoint.x, e.snappedPoint.y),

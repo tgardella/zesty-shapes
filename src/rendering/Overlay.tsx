@@ -26,6 +26,7 @@ import {
   selectionHandleLayout,
 } from '../tools/handles'
 import { gradientAnnotatorLayout } from '../tools/gradientAnnotator'
+import { defaultToolSize, isSizeableTool } from '../tools/toolSizes'
 import { widthHandleLayout } from '../tools/widthEditShared'
 
 const ACCENT = '#3b82f6'
@@ -128,6 +129,8 @@ export function Overlay() {
           ))}
         </>
       )}
+      <ArtboardOverlay />
+      <SizeCursorView />
       <RadiusHandleView />
       <PathEditOverlay />
       <PenPreviewView />
@@ -154,6 +157,98 @@ export function Overlay() {
         )
       })}
     </svg>
+  )
+}
+
+/**
+ * Artboard names (always) + the active artboard's frame and 8 resize handles
+ * while the Artboard tool (Shift+O) is active. Screen space, constant size.
+ */
+function ArtboardOverlay() {
+  const artboards = useEditor((s) => s.document.artboards)
+  const activeToolId = useEditor((s) => s.tool.activeToolId)
+  const activeId = useEditor((s) => s.ui.activeArtboardId)
+  const viewport = useEditor((s) => s.viewport)
+  const toolActive = activeToolId === 'artboard'
+  return (
+    <g>
+      {artboards.map((ab) => {
+        const tl = docToScreen(viewport, { x: ab.x, y: ab.y })
+        const isActive = toolActive && ab.id === activeId
+        return (
+          <g key={ab.id}>
+            <text x={tl.x} y={tl.y - 6} className="artboard-label" fill={isActive ? ACCENT : '#8a8f9d'}>
+              {ab.name}
+            </text>
+            {isActive && <ActiveArtboardFrame ab={ab} />}
+          </g>
+        )
+      })}
+    </g>
+  )
+}
+
+function ActiveArtboardFrame({ ab }: { ab: { x: number; y: number; w: number; h: number } }) {
+  const viewport = useEditor((s) => s.viewport)
+  const tl = docToScreen(viewport, { x: ab.x, y: ab.y })
+  const br = docToScreen(viewport, { x: ab.x + ab.w, y: ab.y + ab.h })
+  const handles: Vec2[] = []
+  for (const uy of [0, 0.5, 1]) {
+    for (const ux of [0, 0.5, 1]) {
+      if (ux === 0.5 && uy === 0.5) continue
+      handles.push({ x: tl.x + (br.x - tl.x) * ux, y: tl.y + (br.y - tl.y) * uy })
+    }
+  }
+  return (
+    <g>
+      <rect
+        x={tl.x}
+        y={tl.y}
+        width={br.x - tl.x}
+        height={br.y - tl.y}
+        fill="none"
+        stroke={ACCENT}
+        strokeWidth={1.4}
+      />
+      {handles.map((p, i) => (
+        <rect
+          key={i}
+          x={p.x - HANDLE_SIZE_PX / 2}
+          y={p.y - HANDLE_SIZE_PX / 2}
+          width={HANDLE_SIZE_PX}
+          height={HANDLE_SIZE_PX}
+          fill="#ffffff"
+          stroke={ACCENT}
+          strokeWidth={1}
+        />
+      ))}
+    </g>
+  )
+}
+
+/**
+ * Tool-size cursor: a translucent, light-bordered circle showing the active
+ * tool's exact size (doc-space diameter, so it scales with zoom), tracking
+ * the pointer. Only for tools registered in TOOL_SIZE_SPECS.
+ */
+function SizeCursorView() {
+  const activeToolId = useEditor((s) => s.tool.activeToolId)
+  const pointer = useEditor((s) => s.ui.pointer)
+  const sizes = useEditor((s) => s.ui.toolSizes)
+  const viewport = useEditor((s) => s.viewport)
+  if (!pointer || !isSizeableTool(activeToolId)) return null
+  const size = sizes[activeToolId] ?? defaultToolSize(activeToolId)
+  const c = docToScreen(viewport, pointer)
+  const r = (size / 2) * viewport.zoom
+  return (
+    <circle
+      cx={c.x}
+      cy={c.y}
+      r={Math.max(r, 1)}
+      fill="rgba(128,140,160,0.12)"
+      stroke="rgba(140,150,170,0.75)"
+      strokeWidth={1}
+    />
   )
 }
 

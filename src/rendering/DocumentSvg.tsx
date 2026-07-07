@@ -19,6 +19,7 @@ export function DocumentSvg() {
       <Defs />
       <PanZoomGroup>
         <Artboards />
+        <GridView />
         <SceneChildren />
       </PanZoomGroup>
     </svg>
@@ -52,6 +53,57 @@ const Artboards = memo(function Artboards() {
         />
       ))}
     </>
+  )
+})
+
+/** Extent of the grid sheet in doc units (well past any plausible artboard). */
+const GRID_EXTENT = 100000
+
+/**
+ * The global grid (lines or dots), drawn in DOCUMENT space above the artboard
+ * sheets and below the scene. One SVG pattern + one covering rect; stroke and
+ * dot sizes divide by zoom so the grid stays hairline at any magnification.
+ */
+const GridView = memo(function GridView() {
+  const grid = useEditor((s) => s.ui.grid)
+  const size = useEditor((s) => s.ui.gridSize)
+  const zoom = useEditor((s) => s.viewport.zoom)
+  if (!grid.show || size <= 0) return null
+  // Skip when cells would be denser than ~4 screen px (unreadable + slow).
+  if (size * zoom < 4) return null
+  const hairline = 1 / zoom
+  const dotR = Math.min(1.5 / zoom, size / 6)
+  return (
+    <g pointerEvents="none">
+      <defs>
+        <pattern id="__global-grid" width={size} height={size} patternUnits="userSpaceOnUse">
+          {grid.style === 'lines' ? (
+            <path
+              d={`M ${size} 0 L 0 0 0 ${size}`}
+              fill="none"
+              stroke="rgba(96,118,180,0.35)"
+              strokeWidth={hairline}
+            />
+          ) : (
+            // A dot at each cell corner: quarter-dots in the four pattern
+            // corners tile into full dots at every grid intersection.
+            <>
+              <circle cx={0} cy={0} r={dotR} fill="rgba(96,118,180,0.55)" />
+              <circle cx={size} cy={0} r={dotR} fill="rgba(96,118,180,0.55)" />
+              <circle cx={0} cy={size} r={dotR} fill="rgba(96,118,180,0.55)" />
+              <circle cx={size} cy={size} r={dotR} fill="rgba(96,118,180,0.55)" />
+            </>
+          )}
+        </pattern>
+      </defs>
+      <rect
+        x={-GRID_EXTENT}
+        y={-GRID_EXTENT}
+        width={GRID_EXTENT * 2}
+        height={GRID_EXTENT * 2}
+        fill="url(#__global-grid)"
+      />
+    </g>
   )
 })
 

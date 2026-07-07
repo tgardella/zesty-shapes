@@ -158,6 +158,7 @@ export class PenTool implements Tool {
     // Start a NEW path at the snapped point (anchors local, placement in transform).
     const style = cloneStyle(ctx.style.current())
     style.fill = null // open stroked path
+    style.strokeWidth = ctx.toolSize.get('pen')
     const anchor = createAnchor({ x: 0, y: 0 })
     const node = createPathNode([createSubPath([anchor], false)], {
       transform: translate(e.snappedPoint.x, e.snappedPoint.y),

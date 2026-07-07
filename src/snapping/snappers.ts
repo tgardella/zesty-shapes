@@ -5,26 +5,19 @@
 import type { Vec2 } from '../geometry/vec2'
 import type { SnapQuery, SnapResult, SnapSettings, Snapper } from './types'
 
-/** Screen-pixel pull radius for grid snapping (divided by zoom per query). */
-export const GRID_SNAP_THRESHOLD_PX = 6
-
 /**
- * Snaps each axis independently to the nearest grid line when within the
- * threshold. Emits no guides — the snapped position itself is the feedback.
+ * Snap-to-grid LOCKS to the grid (Illustrator semantics): every point
+ * quantizes to the nearest grid intersection, so drawing and moving land on
+ * grid lines regardless of distance. Emits no guides — the snapped position
+ * itself is the feedback.
  */
 export const gridSnapper: Snapper = {
   id: 'grid',
-  snap(point: Vec2, query: SnapQuery, settings: SnapSettings): SnapResult | null {
+  snap(point: Vec2, _query: SnapQuery, settings: SnapSettings): SnapResult | null {
     if (!settings.snapToGrid || settings.gridSize <= 0) return null
-    const threshold = GRID_SNAP_THRESHOLD_PX / query.zoom
     const g = settings.gridSize
-    const gx = Math.round(point.x / g) * g
-    const gy = Math.round(point.y / g) * g
-    const snapX = Math.abs(point.x - gx) <= threshold
-    const snapY = Math.abs(point.y - gy) <= threshold
-    if (!snapX && !snapY) return null
     return {
-      point: { x: snapX ? gx : point.x, y: snapY ? gy : point.y },
+      point: { x: Math.round(point.x / g) * g, y: Math.round(point.y / g) * g },
       guides: [],
     }
   },
