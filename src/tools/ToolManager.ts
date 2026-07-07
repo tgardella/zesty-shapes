@@ -35,7 +35,7 @@ import {
 } from '../store/artboardCommands'
 import { finishTextEdit } from '../store/textCommands'
 import { defaultToolSize } from './toolSizes'
-import { copySelection, cutSelection, pasteClipboard } from '../store/clipboard'
+import { clipboardIsEmpty, copySelection, cutSelection, pasteClipboard } from '../store/clipboard'
 import { effectiveScopeId, type EditorStoreApi } from '../store/store'
 import { worldTransform } from '../store/worldTransform'
 import { createDefaultSnapEngine, type SnapEngine } from '../snapping/engine'
@@ -198,6 +198,11 @@ export class ToolManager {
         return true
       }
       if (key === 'v') {
+        // Prefer the in-app clipboard when it holds copied nodes. When it's
+        // empty, DON'T consume the key: let the browser's native `paste` event
+        // fire so registerImportHandlers can import external images / SVG
+        // (preventDefault here would suppress that event).
+        if (clipboardIsEmpty()) return false
         pasteClipboard(this.store)
         return true
       }
@@ -362,6 +367,7 @@ export class ToolManager {
         get: (toolId) => g().ui.toolSizes[toolId] ?? defaultToolSize(toolId),
         set: (toolId, size) => g().setToolSize(toolId, size),
       },
+      gridSnap: () => ({ enabled: g().ui.snapToGrid, size: g().ui.gridSize }),
     }
   }
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createDefaultSnapEngine } from './engine'
-import { angleSnapper, gridSnapper } from './snappers'
+import { angleSnapper, gridAlignedDelta, gridSnapper } from './snappers'
 import type { SnapQuery, SnapSettings } from './types'
 
 const noGrid: SnapSettings = { snapToGrid: false, gridSize: 10 }
@@ -19,6 +19,26 @@ describe('gridSnapper', () => {
 
   it('does nothing when snap-to-grid is off', () => {
     expect(gridSnapper.snap({ x: 10.01, y: 10.01 }, free, noGrid)).toBeNull()
+  })
+})
+
+describe('gridAlignedDelta (object move snapping)', () => {
+  it('lands the reference point on the grid, independent of the grab offset', () => {
+    // Object top-left at (80,80); a raw drag of (63,63) with a 40 grid should
+    // put the top-left on the nearest intersection (160,160) -> delta (80,80).
+    const ref = { x: 80, y: 80 }
+    const delta = gridAlignedDelta(ref, { x: 63, y: 63 }, 40)
+    expect(delta).toEqual({ x: 80, y: 80 })
+    expect(ref.x + delta.x).toBe(160)
+    expect(ref.y + delta.y).toBe(160)
+  })
+
+  it('adapts to whatever grid spacing is set', () => {
+    const ref = { x: 75, y: 75 }
+    // 25 grid: x 75+12=87 -> nearest 75 -> delta 0; y 75+40=115 -> nearest 125 -> delta 50.
+    expect(gridAlignedDelta(ref, { x: 12, y: 40 }, 25)).toEqual({ x: 0, y: 50 })
+    // 96 grid (inch): 75 + 30 = 105 -> nearest 96 is 96 -> delta 21.
+    expect(gridAlignedDelta({ x: 75, y: 0 }, { x: 30, y: 0 }, 96).x).toBe(21)
   })
 })
 

@@ -15,9 +15,11 @@ import type { Mat } from '../geometry/matrix'
 import { invert, applyToPoint } from '../geometry/matrix'
 import type { Vec2 } from '../geometry/vec2'
 import { distance, scale, sub } from '../geometry/vec2'
+import { worldBBoxOfNode } from '../geometry/bbox'
 import type { NodeId } from '../model/types'
 import { docDeltaInParentSpace } from '../store/commands'
 import { worldTransform } from '../store/worldTransform'
+import { gridAlignedDelta } from '../snapping/snappers'
 import { DragBehavior } from './behaviors/DragBehavior'
 import { MarqueeBehavior } from './behaviors/MarqueeBehavior'
 import { TransformHandleController } from './behaviors/TransformHandleBehavior'
@@ -50,6 +52,8 @@ export class SelectionTool implements Tool {
   /** Plain-clicked one node of a multi-selection: collapse to it on up unless dragged. */
   private collapseOnUp = false
   private baseTransforms: Array<{ id: NodeId; base: Mat }> = []
+  /** Primary object's world-bbox top-left at drag start (grid-snap anchor). */
+  private snapRef: Vec2 | null = null
   /** Non-null while dragging the corner-radius widget. */
   private radiusNodeId: NodeId | null = null
   /** Scale/rotate gestures on the bbox handles + rotation knob. */
@@ -70,9 +74,19 @@ export class SelectionTool implements Tool {
       this.baseTransforms = ids
         .filter((id) => doc.nodes[id] && !doc.nodes[id]!.locked)
         .map((id) => ({ id, base: [...doc.nodes[id]!.transform] as Mat }))
+      // Grid snap anchors on the PRIMARY object's world-space top-left, so
+      // the moved object lands on the grid (not the cursor under the grab).
+      const first = this.baseTransforms[0]
+      const b = first ? worldBBoxOfNode(doc.nodes, first.id, worldTransform(doc.nodes, first.id)) : null
+      this.snapRef = b ? { x: b.minX, y: b.minY } : null
     },
     onMove: (e, ctx) => {
-      const docDelta = sub(e.snappedPoint, this.downDoc)
+      const grid = ctx.gridSnap()
+      const docDelta =
+        grid.enabled && grid.size > 0 && this.snapRef
+          ? // Snap the OBJECT: land its top-left on the nearest grid line.
+            gridAlignedDelta(this.snapRef, sub(e.docPoint, this.downDoc), grid.size)
+          : sub(e.snappedPoint, this.downDoc)
       const doc = ctx.getDocument()
       const entries = this.baseTransforms.map(({ id, base }) => {
         const d = docDeltaInParentSpace(doc.nodes, doc.nodes[id]?.parent ?? null, doc.root, docDelta)
@@ -87,6 +101,7 @@ export class SelectionTool implements Tool {
       this.deselectOnUp = null
       this.collapseOnUp = false
       this.baseTransforms = []
+      this.snapRef = null
     },
     onClick: (_e, ctx) => {
       if (this.deselectOnUp) {

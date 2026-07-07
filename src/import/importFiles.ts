@@ -11,10 +11,15 @@
 import type { Vec2 } from '../geometry/vec2'
 import { createImageNode } from '../model/nodes'
 import type { SceneNode } from '../model/types'
+import { pasteClipboard } from '../store/clipboard'
 import { screenToDoc } from '../store/coords'
 import { cmdInsertImportedNodes } from '../store/importCommands'
 import type { EditorStoreApi } from '../store/store'
 import { importSVG } from './svgImport'
+
+function looksLikeSvg(text: string): boolean {
+  return text.trimStart().startsWith('<') && text.includes('<svg')
+}
 
 /** Doc-space point imports center on: viewport center (artboards pan there). */
 function importCenter(store: EditorStoreApi): Vec2 {
@@ -156,15 +161,34 @@ export function registerImportHandlers(store: EditorStoreApi): () => void {
     if (target && (target.isContentEditable || /INPUT|TEXTAREA|SELECT/.test(target.tagName))) return
     const dt = e.clipboardData
     if (!dt) return
-    const files = Array.from(dt.files)
-    const text = dt.getData('text/plain')
-    if (files.length > 0) {
+
+    // Files first: covers "copy image" and copying a file in the OS. Some
+    // browsers expose pasted images only through items, so scan both.
+    const files = new Map<string, File>()
+    for (const f of Array.from(dt.files)) files.set(`${f.name}:${f.size}`, f)
+    for (const item of Array.from(dt.items)) {
+      if (item.kind === 'file') {
+        const f = item.getAsFile()
+        if (f) files.set(`${f.name}:${f.size}`, f)
+      }
+    }
+    if (files.size > 0) {
       e.preventDefault()
-      for (const f of files) void importFile(store, f)
-    } else if (text.trimStart().startsWith('<') && text.includes('<svg')) {
+      for (const f of files.values()) void importFile(store, f)
+      return
+    }
+
+    // SVG source text (copied from a code/design tool).
+    const text = dt.getData('text/plain')
+    if (looksLikeSvg(text)) {
       e.preventDefault()
       importSvgText(store, text, 'Pasted SVG')
+      return
     }
+
+    // No external content on the clipboard: fall back to the in-app clipboard
+    // (covers right-click → Paste of copied nodes).
+    pasteClipboard(store)
   }
   const onDragOver = (e: DragEvent): void => {
     if (e.dataTransfer?.types.includes('Files')) e.preventDefault()
