@@ -202,6 +202,12 @@ export interface ToolContext {
     activeDef(): BrushDef
   }
 
+  /** Symbolism adjuster settings (top-bar Intensity). */
+  symbolism: {
+    /** How fast the adjusters apply (0-1). */
+    intensity(): number
+  }
+
   /** In-place text editing target (HTML overlay); never undoable. */
   textEdit: {
     get(): { nodeId: NodeId } | null

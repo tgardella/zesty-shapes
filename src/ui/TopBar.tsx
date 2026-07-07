@@ -7,6 +7,7 @@
 import { editorStore, useEditor } from '../store/store'
 import { cmdSetBlendSteps } from '../store/blendCommands'
 import { BUILTIN_BRUSHES } from '../model/brushLibrary'
+import { rgbToHex } from '../model/color'
 import { TOOL_SIZE_SPECS } from '../tools/toolSizes'
 
 /** Grid spacing presets in doc units (CSS px): 96/inch, ~37.8/cm. */
@@ -29,6 +30,9 @@ export function TopBar() {
   const activeToolId = useEditor((s) => s.tool.activeToolId)
   const toolSize = useEditor((s) => s.ui.toolSizes[s.tool.activeToolId])
   const activeBrushId = useEditor((s) => s.ui.activeBrushId)
+  const currentFill = useEditor((s) => s.ui.currentStyle.fill)
+  const symbolismIntensity = useEditor((s) => s.ui.symbolismIntensity)
+  const isSymbolismTool = activeToolId.startsWith('symbol-') && activeToolId !== 'symbol-sprayer'
 
   const zoomBy = (factor: number) => editorStore.getState().zoomAtPoint(viewportCenter(), factor)
   const sizeSpec = TOOL_SIZE_SPECS[activeToolId]
@@ -164,6 +168,28 @@ export function TopBar() {
             </option>
           ))}
         </select>
+      )}
+
+      {isSymbolismTool && (
+        <label className="tool-size" title="Intensity: how fast the adjuster applies (Illustrator's tool options)">
+          Intensity
+          <input
+            type="range"
+            min={0.05}
+            max={1}
+            step={0.05}
+            value={symbolismIntensity}
+            onChange={(e) => editorStore.getState().setSymbolismIntensity(parseFloat(e.target.value))}
+          />
+        </label>
+      )}
+
+      {activeToolId === 'symbol-stainer' && (
+        <span className="topbar-hint" title="Brush size: [ and ]. Alt-drag to reveal original colors.">
+          Tints toward Fill{currentFill && currentFill.type === 'solid'
+            ? ` (${rgbToHex(currentFill.color)})`
+            : ''} · [ ] size · Alt reveals
+        </span>
       )}
 
       <div className="topbar-spacer" />

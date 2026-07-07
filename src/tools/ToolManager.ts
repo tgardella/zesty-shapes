@@ -48,7 +48,7 @@ import {
   cmdUpdateArtboard,
 } from '../store/artboardCommands'
 import { finishTextEdit } from '../store/textCommands'
-import { defaultToolSize } from './toolSizes'
+import { defaultToolSize, TOOL_SIZE_SPECS } from './toolSizes'
 import { clipboardIsEmpty, copySelection, cutSelection, pasteClipboard } from '../store/clipboard'
 import { effectiveScopeId, type EditorStoreApi } from '../store/store'
 import { worldTransform } from '../store/worldTransform'
@@ -187,6 +187,17 @@ export class ToolManager {
     if (e.code === 'Space') {
       state.setSpaceHeld(true)
       return true
+    }
+    // Bracket keys resize the active size-cursor tool's brush (Illustrator).
+    if ((e.key === '[' || e.key === ']') && !meta) {
+      const toolId = state.tool.activeToolId
+      const spec = TOOL_SIZE_SPECS[toolId]
+      if (spec) {
+        const cur = state.ui.toolSizes[toolId] ?? spec.default
+        const next = e.key === ']' ? cur * 1.15 : cur / 1.15
+        state.setToolSize(toolId, Math.max(spec.min, Math.min(spec.max, next)))
+        return true
+      }
     }
     // The active tool gets first crack at editing keys (Delete of selected
     // anchors, Enter to finish a pen path, mid-drag arrow keys, nudge...).
@@ -372,6 +383,9 @@ export class ToolManager {
       },
       brush: {
         activeDef: () => brushById(g().ui.activeBrushId),
+      },
+      symbolism: {
+        intensity: () => g().ui.symbolismIntensity,
       },
       textEdit: {
         get: () => g().ui.textEdit,

@@ -90,6 +90,12 @@ export interface Style {
    * until the offset/boolean engine lands (see model/widthProfile.ts).
    */
   widthProfile?: WidthStop[]
+  /**
+   * The fill color BEFORE the Symbol Stainer first tinted this object. Alt-drag
+   * with the Stainer lerps the fill back toward this to reveal the original.
+   * Absent until the Stainer touches the object.
+   */
+  stainBase?: RGBA
 }
 
 // ---------------------------------------------------------------------------

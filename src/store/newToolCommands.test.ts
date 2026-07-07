@@ -442,8 +442,8 @@ describe('cmdSymbolismAdjust', () => {
   }
 
   it('Sizer grows only the in-range instance', () => {
-    const { store, groupId, near, far } = symbolSet()
-    const ok = cmdSymbolismAdjust(store, [groupId], {
+    const { store, near, far } = symbolSet()
+    const ok = cmdSymbolismAdjust(store, [near.id, far.id], {
       kind: 'size',
       center: { x: 10, y: 10 },
       radius: 40,
@@ -457,8 +457,8 @@ describe('cmdSymbolismAdjust', () => {
   })
 
   it('Shifter translates the in-range instance by the pointer delta', () => {
-    const { store, groupId, near } = symbolSet()
-    cmdSymbolismAdjust(store, [groupId], {
+    const { store, near, far } = symbolSet()
+    cmdSymbolismAdjust(store, [near.id, far.id], {
       kind: 'shift',
       center: { x: 10, y: 10 },
       radius: 40,
@@ -471,8 +471,8 @@ describe('cmdSymbolismAdjust', () => {
   })
 
   it('Stainer tints the in-range instance toward the target color', () => {
-    const { store, groupId, near, far } = symbolSet()
-    cmdSymbolismAdjust(store, [groupId], {
+    const { store, near, far } = symbolSet()
+    cmdSymbolismAdjust(store, [near.id, far.id], {
       kind: 'stain',
       center: { x: 10, y: 10 },
       radius: 40,
@@ -488,9 +488,9 @@ describe('cmdSymbolismAdjust', () => {
   })
 
   it('does nothing when no instance is in range', () => {
-    const { store, groupId } = symbolSet()
+    const { store, near, far } = symbolSet()
     expect(
-      cmdSymbolismAdjust(store, [groupId], {
+      cmdSymbolismAdjust(store, [near.id, far.id], {
         kind: 'size',
         center: { x: 1000, y: 1000 },
         radius: 10,
@@ -498,5 +498,48 @@ describe('cmdSymbolismAdjust', () => {
         alt: false,
       }),
     ).toBe(false)
+  })
+
+  it('stains a standalone shape (a leaf acts as its own instance)', () => {
+    const store = layeredStore()
+    const rect = createRectNode({ x: 0, y: 0, w: 20, h: 20 })
+    rect.style.fill = { ...red }
+    cmdAddNode(store, rect)
+    const ok = cmdSymbolismAdjust(store, [rect.id], {
+      kind: 'stain',
+      center: { x: 10, y: 10 },
+      radius: 40,
+      strength: 0.6,
+      color: { r: 0, g: 0, b: 255, a: 1 },
+      alt: false,
+    })
+    expect(ok).toBe(true)
+    const fill = store.getState().document.nodes[rect.id]!.style.fill
+    expect(fill && fill.type === 'solid' && fill.color.b).toBeGreaterThan(50)
+  })
+
+  it('Stainer Alt reduces the tint back toward the captured original', () => {
+    const store = layeredStore()
+    const rect = createRectNode({ x: 0, y: 0, w: 20, h: 20 })
+    rect.style.fill = { ...red } // {255,0,0}
+    cmdAddNode(store, rect)
+    const stainArgs = {
+      kind: 'stain' as const,
+      center: { x: 10, y: 10 },
+      radius: 40,
+      color: { r: 0, g: 0, b: 255, a: 1 },
+    }
+    cmdSymbolismAdjust(store, [rect.id], { ...stainArgs, strength: 0.6, alt: false })
+    let node = store.getState().document.nodes[rect.id]!
+    const stained = node.style.fill as { type: 'solid'; color: { r: number; b: number } }
+    expect(stained.color.b).toBeGreaterThan(50)
+    // The pristine red is captured for later reveal.
+    expect(node.style.stainBase).toEqual({ r: 255, g: 0, b: 0, a: 1 })
+    // Alt-stain lerps the fill back toward the captured original.
+    cmdSymbolismAdjust(store, [rect.id], { ...stainArgs, strength: 0.9, alt: true })
+    node = store.getState().document.nodes[rect.id]!
+    const reduced = node.style.fill as { type: 'solid'; color: { r: number; b: number } }
+    expect(reduced.color.r).toBeGreaterThan(stained.color.r)
+    expect(reduced.color.b).toBeLessThan(stained.color.b)
   })
 })
