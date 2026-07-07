@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { leafNodeAtPoint, nodesInDocRect } from './hitTest'
+import { leafNodeAtPoint, nodesInDocRect, resolveTopLevel } from './hitTest'
 import { addNode, createDocument } from '../model/document'
 import { createGroupNode, createRectNode, createTextNode } from '../model/nodes'
 import { compose, rotateMat, translate } from '../geometry/matrix'
@@ -90,5 +90,44 @@ describe('leafNodeAtPoint (geometric tolerance hit)', () => {
     addNode(doc, text)
     expect(leafNodeAtPoint(doc, { x: 60, y: 45 }, 2)).toBe(text.id) // inside the block
     expect(leafNodeAtPoint(doc, { x: 200, y: 200 }, 2)).toBeNull()
+  })
+})
+
+describe('layers are transparent to selection', () => {
+  it('resolveTopLevel selects the object inside a layer, never the layer', () => {
+    const doc = createDocument()
+    const layer = createGroupNode({ name: 'Layer 1', isLayer: true })
+    const rect = createRectNode({ x: 0, y: 0, w: 10, h: 10 })
+    addNode(doc, layer)
+    addNode(doc, rect, layer.id)
+    // Clicking the rect resolves to the rect, not the layer.
+    expect(resolveTopLevel(doc, rect.id, doc.root)).toBe(rect.id)
+    // Clicking the layer itself resolves to nothing (layers aren't art).
+    expect(resolveTopLevel(doc, layer.id, doc.root)).toBeNull()
+  })
+
+  it('resolveTopLevel stops at the nearest layer through sublayers', () => {
+    const doc = createDocument()
+    const layer = createGroupNode({ name: 'Layer 1', isLayer: true })
+    const sub = createGroupNode({ name: 'Sublayer', isLayer: true })
+    const group = createGroupNode({ name: 'G' })
+    const rect = createRectNode({ x: 0, y: 0, w: 10, h: 10 })
+    addNode(doc, layer)
+    addNode(doc, sub, layer.id)
+    addNode(doc, group, sub.id)
+    addNode(doc, rect, group.id)
+    // The top-level art within the nearest layer (sub) is the group.
+    expect(resolveTopLevel(doc, rect.id, doc.root)).toBe(group.id)
+  })
+
+  it('nodesInDocRect flattens layers and returns the objects', () => {
+    const doc = createDocument()
+    const layer = createGroupNode({ name: 'Layer 1', isLayer: true })
+    const a = createRectNode({ x: 0, y: 0, w: 10, h: 10 })
+    const b = createRectNode({ x: 0, y: 0, w: 10, h: 10 }, { transform: translate(100, 0) })
+    addNode(doc, layer)
+    addNode(doc, a, layer.id)
+    addNode(doc, b, layer.id)
+    expect(nodesInDocRect(doc, { minX: -5, minY: -5, maxX: 15, maxY: 15 })).toEqual([a.id])
   })
 })

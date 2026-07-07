@@ -13,7 +13,7 @@ import {
   docDeltaInParentSpace,
   type SubtreePlacement,
 } from './commands'
-import { effectiveScopeId, type EditorStoreApi } from './store'
+import { resolveInsertionParent, type EditorStoreApi } from './store'
 
 export const PASTE_OFFSET = 10
 
@@ -61,27 +61,28 @@ export function cutSelection(store: EditorStoreApi): number {
 }
 
 /**
- * Paste into the current edit scope (root when not isolated), offset by
- * (+10, +10) doc units, appended on top. Fresh ids per paste; the pasted
- * nodes become the selection. Returns the new root ids.
+ * Paste into the ACTIVE layer (the isolation scope when inside a group, else
+ * the active layer / topmost — resolveInsertionParent), offset by (+10, +10)
+ * doc units, appended on top. Fresh ids per paste; the pasted nodes become the
+ * selection. Returns the new root ids.
  */
 export function pasteClipboard(store: EditorStoreApi): NodeId[] {
   if (!snapshot) return []
   const state = store.getState()
   const doc = state.document
-  const scope = effectiveScopeId(state)
+  const target = resolveInsertionParent(state)
   const clones = cloneSubtrees(snapshot.nodes, snapshot.rootIds)
   if (clones.rootIds.length === 0) return []
 
   const offset = docDeltaInParentSpace(
     doc.nodes,
-    scope === doc.root ? null : scope,
+    target === doc.root ? null : target,
     doc.root,
     { x: PASTE_OFFSET, y: PASTE_OFFSET },
   )
   const placements: Record<NodeId, SubtreePlacement> = {}
   for (const rootId of clones.rootIds) {
-    placements[rootId] = { parentId: scope }
+    placements[rootId] = { parentId: target }
     const clone = clones.nodes.find((n) => n.id === rootId)!
     clone.transform = [
       clone.transform[0],

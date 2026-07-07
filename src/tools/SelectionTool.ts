@@ -169,8 +169,14 @@ export class SelectionTool implements Tool {
 
     if (e.hitNodeId) {
       const doc = ctx.getDocument()
-      // Clicking a node that lives outside the current scope exits isolation.
-      if (doc.nodes[e.hitNodeId]?.parent === doc.root && ctx.scope.current() !== doc.root) {
+      // Clicking top-level art (a direct child of the root or a layer) while
+      // isolated inside a group exits isolation. Layers are transparent, so
+      // their children count as top-level.
+      const parentId = doc.nodes[e.hitNodeId]?.parent
+      const parentNode = parentId ? doc.nodes[parentId] : null
+      const isTopLevelArt =
+        parentId === doc.root || (parentNode?.type === 'group' && parentNode.isLayer === true)
+      if (isTopLevelArt && ctx.scope.current() !== doc.root) {
         ctx.scope.set(null)
       }
       const selection = ctx.getSelection()

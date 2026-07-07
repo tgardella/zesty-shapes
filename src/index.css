@@ -200,6 +200,50 @@ body {
   border-bottom: 1px solid #1c1e24;
 }
 
+/* Contextual panels scroll in the space above the resizable Layers panel. */
+.sidebar-panels {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Layers panel: user-resizable fixed height, its list scrolls internally. */
+.layers-panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 140px;
+  flex-shrink: 0;
+}
+
+.layers-resize {
+  position: absolute;
+  top: -3px;
+  left: 0;
+  right: 0;
+  height: 7px;
+  cursor: ns-resize;
+  touch-action: none;
+  z-index: 5;
+}
+
+.layers-resize::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: #1c1e24;
+}
+
+.layers-resize:hover::after {
+  background: #3b82f6;
+  height: 2px;
+}
+
 .panel-grow {
   flex: 1;
   display: flex;
@@ -607,18 +651,160 @@ body {
 
 /* -- layers -- */
 
+.layers-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.layers-header .panel-title {
+  margin-bottom: 0;
+}
+
+.layers-menu-wrap {
+  position: relative;
+}
+
+.layers-menu-btn {
+  border: none;
+  background: none;
+  color: #8b92a5;
+  cursor: pointer;
+  font-size: 15px;
+  line-height: 1;
+  padding: 2px 4px;
+  border-radius: 3px;
+}
+
+.layers-menu-btn:hover {
+  background: #2d3039;
+  color: #dfe1ea;
+}
+
+.menu-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+}
+
+.layers-menu {
+  position: absolute;
+  right: 0;
+  top: 22px;
+  z-index: 41;
+  min-width: 172px;
+  background: #2b2e36;
+  border: 1px solid #3d414b;
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+}
+
+.layers-menu button {
+  text-align: left;
+  border: none;
+  background: none;
+  color: #dfe1ea;
+  font-size: 12px;
+  padding: 5px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.layers-menu button:hover:not(:disabled) {
+  background: #31415f;
+}
+
+.layers-menu button:disabled {
+  color: #565d6e;
+  cursor: default;
+}
+
+.layers-menu .menu-saved {
+  color: #9fb2d8;
+}
+
+.menu-sep {
+  height: 1px;
+  background: #3d414b;
+  margin: 4px 2px;
+}
+
+/* Canvas right-click menu (shares menu-backdrop / menu-sep). */
+.context-menu {
+  position: fixed;
+  z-index: 60;
+  min-width: 168px;
+  background: #2b2e36;
+  border: 1px solid #3d414b;
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+}
+
+.context-menu button {
+  text-align: left;
+  border: none;
+  background: none;
+  color: #dfe1ea;
+  font-size: 12px;
+  padding: 6px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.context-menu button:hover:not(:disabled) {
+  background: #31415f;
+}
+
+.context-menu button:disabled {
+  color: #565d6e;
+  cursor: default;
+}
+
+.layers-tools {
+  display: flex;
+  gap: 5px;
+  margin-bottom: 6px;
+}
+
+.layers-search {
+  flex: 1;
+  min-width: 0;
+  background: #1c1e24;
+  border: 1px solid #3d414b;
+  border-radius: 4px;
+  color: #dfe1ea;
+  font-size: 12px;
+  padding: 3px 6px;
+}
+
+.layers-filter {
+  background: #2e3138;
+  color: #dfe1ea;
+  border: 1px solid #3d414b;
+  border-radius: 4px;
+  font-size: 12px;
+  padding: 2px 4px;
+}
+
 .layers-list {
   flex: 1;
   overflow-y: auto;
-  margin: 0 -10px -12px;
+  margin: 0 -10px;
 }
 
 .layer-row {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 3px;
   height: 26px;
-  padding-right: 6px;
+  padding: 0 6px 0 4px;
   font-size: 12px;
   cursor: default;
   border-top: 1px solid transparent;
@@ -626,11 +812,24 @@ body {
   user-select: none;
 }
 
+.layer-row.is-layer {
+  background: #24262c;
+}
+
 .layer-row:hover {
   background: #2d3039;
 }
 
 .layer-row.selected {
+  background: #31415f;
+}
+
+.layer-row.active-layer {
+  box-shadow: inset 3px 0 0 #3b82f6;
+  background: #23324a;
+}
+
+.layer-row.active-layer.selected {
   background: #31415f;
 }
 
@@ -647,14 +846,73 @@ body {
   outline-offset: -1px;
 }
 
+.layer-col-icon {
+  width: 19px;
+  flex-shrink: 0;
+  border: none;
+  background: none;
+  color: #c6cbd8;
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.layer-col-icon.off {
+  color: #565d6e;
+}
+
+.layer-col-icon.faint {
+  color: #3a3e48;
+}
+
+.layer-col-icon.faint:hover {
+  color: #c6cbd8;
+}
+
+.layer-col-icon.on {
+  color: #e6a23c;
+}
+
+/* State inherited from an ancestor layer/group: shown but not toggleable. */
+.layer-col-icon.inherited {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.layer-col-icon:disabled {
+  cursor: default;
+}
+
+/* A row hidden by itself or an ancestor: dim its name/thumbnail so it's
+   obvious which art is invisible while scanning the panel. */
+.layer-row.row-hidden .layer-main {
+  opacity: 0.4;
+}
+
+/* A row locked by itself or an ancestor: mute the name to read as inactive. */
+.layer-row.row-locked .layer-name {
+  color: #8b92a5;
+}
+
+.layer-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
 .layer-caret {
-  width: 14px;
+  width: 13px;
+  flex-shrink: 0;
   border: none;
   background: none;
   color: #8b92a5;
   cursor: pointer;
   padding: 0;
-  font-size: 10px;
+  font-size: 9px;
   transition: transform 0.1s;
 }
 
@@ -663,13 +921,23 @@ body {
 }
 
 .layer-caret-spacer {
-  width: 14px;
+  width: 13px;
   flex-shrink: 0;
+}
+
+.layer-swatch {
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 2px;
+  cursor: pointer;
+  padding: 0;
 }
 
 .layer-type {
   flex-shrink: 0;
-  color: #8b92a5;
+  color: #9096a6;
 }
 
 .layer-name {
@@ -677,6 +945,21 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.layer-name-bold {
+  font-weight: 600;
+}
+
+.layer-tag {
+  margin-left: 6px;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #8b92a5;
+  border: 1px solid #4a4f5b;
+  border-radius: 3px;
+  padding: 0 3px;
 }
 
 .layer-rename {
@@ -690,29 +973,123 @@ body {
   padding: 1px 4px;
 }
 
-.layer-flag {
-  width: 18px;
+.layer-target {
+  width: 20px;
+  flex-shrink: 0;
   border: none;
   background: none;
   color: #565d6e;
   cursor: pointer;
   padding: 0;
-  font-size: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.layer-row:hover .layer-target {
+  color: #8b92a5;
+}
+
+.layer-target.on {
+  color: #cfd6e6;
+}
+
+.layer-selbox {
+  width: 14px;
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.layer-flag:hover {
-  color: #c6cbd8;
+.selbox {
+  width: 9px;
+  height: 9px;
+  border-radius: 1px;
 }
 
-.layer-flag.on {
-  color: #e6a23c;
+.selbox.partial {
+  width: 5px;
+  height: 5px;
+}
+
+.layers-footer {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding-top: 6px;
+  margin: 0 -2px -4px;
+  border-top: 1px solid #1c1e24;
+}
+
+.layers-footer button {
+  border: none;
+  background: none;
+  color: #b9bdc9;
+  cursor: pointer;
+  padding: 4px 5px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+}
+
+.layers-footer button:hover:not(:disabled) {
+  background: #2d3039;
+  color: #dfe1ea;
+}
+
+.layers-footer button:disabled {
+  color: #4a4f5b;
+  cursor: default;
+}
+
+.layers-footer-spacer {
+  flex: 1;
 }
 
 .layers-empty {
   padding: 12px;
   color: #565d6e;
   font-size: 12px;
+}
+
+/* Layer Options dialog */
+.dialog-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #dfe1ea;
+  margin-top: 8px;
+}
+
+.layer-color-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.color-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  border: 2px solid transparent;
+  cursor: pointer;
+  padding: 0;
+}
+
+.color-dot.sel {
+  border-color: #ffffff;
+}
+
+.dim-pct {
+  width: 52px;
+  background: #1c1e24;
+  color: #dfe1ea;
+  border: 1px solid #3d414b;
+  border-radius: 4px;
+  font-size: 12px;
+  padding: 2px 5px;
 }
 
 /* -- phase 7: grid + tool size controls, dialogs -- */

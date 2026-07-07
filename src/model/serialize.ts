@@ -131,6 +131,8 @@ function commonAttrs(node: SceneNode): string {
 function nodeToSVG(doc: Document, id: NodeId, reg: DefsRegistry): string {
   const node = doc.nodes[id]
   if (!node || node.hidden) return ''
+  // Template layers are tracing aids — never printed/exported (Illustrator).
+  if (node.type === 'group' && node.template) return ''
   if (node.type === 'group') {
     const inner = node.children.map((childId) => nodeToSVG(doc, childId, reg)).join('')
     return `<g id="${escapeXml(node.id)}"${commonAttrs(node)}>${inner}</g>`

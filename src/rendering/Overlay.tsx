@@ -16,6 +16,7 @@ import { subpathsToPathData, transformSubPaths } from '../geometry/pathData'
 import type { Vec2 } from '../geometry/vec2'
 import type { NodeId } from '../model/types'
 import { toSubPaths } from '../model/nodes'
+import { layerColorOf } from '../model/layers'
 import { docToScreen } from '../store/coords'
 import { useEditor } from '../store/store'
 import { worldTransform } from '../store/worldTransform'
@@ -36,54 +37,64 @@ const RADIUS_DIAMOND_R = 5
 export function Overlay() {
   const selection = useEditor((s) => s.selection)
   const nodes = useEditor((s) => s.document.nodes)
+  const root = useEditor((s) => s.document.root)
   const viewport = useEditor((s) => s.viewport)
   const marquee = useEditor((s) => s.ui.marquee)
   const guides = useEditor((s) => s.ui.snapGuides)
 
+  // Selection outlines/handles use the OWNING LAYER's color (Illustrator).
+  const colorFor = (id: NodeId): string => layerColorOf({ nodes, root }, id) ?? ACCENT
+
   // Selection highlight: the EXACT geometry of every selected leaf (groups
   // recurse), transformed local -> world -> screen — not the bounding box.
   // Text (no outline geometry) falls back to its tight layout-bbox corners.
-  const outlinePaths: string[] = []
-  const textBoxes: Vec2[][] = []
+  const outlinePaths: { d: string; color: string }[] = []
+  const textBoxes: { corners: Vec2[]; color: string }[] = []
   const screenMat: Mat = [viewport.zoom, 0, 0, viewport.zoom, viewport.tx, viewport.ty]
-  const collectOutline = (id: NodeId): void => {
+  const collectOutline = (id: NodeId, color: string): void => {
     const node = nodes[id]
     if (!node || node.hidden) return
     if (node.type === 'group') {
-      for (const child of node.children) collectOutline(child)
+      for (const child of node.children) collectOutline(child, color)
       return
     }
     const world = worldTransform(nodes, id)
     if (node.type === 'text') {
       const local = localBBoxOfNode(node, nodes)
       if (!local) return
-      textBoxes.push(
-        [
+      textBoxes.push({
+        color,
+        corners: [
           { x: local.minX, y: local.minY },
           { x: local.maxX, y: local.minY },
           { x: local.maxX, y: local.maxY },
           { x: local.minX, y: local.maxY },
         ].map((p) => docToScreen(viewport, applyToPoint(world, p))),
-      )
+      })
       return
     }
-    outlinePaths.push(subpathsToPathData(transformSubPaths(compose(screenMat, world), toSubPaths(node))))
+    outlinePaths.push({
+      color,
+      d: subpathsToPathData(transformSubPaths(compose(screenMat, world), toSubPaths(node))),
+    })
   }
-  for (const id of selection) collectOutline(id)
+  for (const id of selection) collectOutline(id, colorFor(id))
 
   const layout = selectionHandleLayout(nodes, selection, viewport)
+  // The combined bounding box uses the primary selection's layer color.
+  const boxColor = selection.length > 0 ? colorFor(selection[0]!) : ACCENT
 
   return (
     <svg className="overlay-svg">
-      {outlinePaths.map((d, i) => (
-        <path key={i} d={d} fill="none" stroke={ACCENT} strokeWidth={1.4} />
+      {outlinePaths.map((o, i) => (
+        <path key={i} d={o.d} fill="none" stroke={o.color} strokeWidth={1.4} />
       ))}
-      {textBoxes.map((corners, i) => (
+      {textBoxes.map((t, i) => (
         <polygon
           key={i}
-          points={corners.map((p) => `${p.x},${p.y}`).join(' ')}
+          points={t.corners.map((p) => `${p.x},${p.y}`).join(' ')}
           fill="none"
-          stroke={ACCENT}
+          stroke={t.color}
           strokeWidth={1}
         />
       ))}
@@ -95,7 +106,7 @@ export function Overlay() {
             width={layout.boxScreen.w}
             height={layout.boxScreen.h}
             fill="none"
-            stroke={ACCENT}
+            stroke={boxColor}
             strokeWidth={1}
           />
           {/* Rotation affordance: stem + knob (drag rotates; also the R tool). */}
@@ -104,7 +115,7 @@ export function Overlay() {
             y1={layout.boxScreen.y - HANDLE_SIZE_PX / 2}
             x2={layout.rotationKnobScreen.x}
             y2={layout.rotationKnobScreen.y + ROTATE_KNOB_RADIUS_PX}
-            stroke={ACCENT}
+            stroke={boxColor}
             strokeWidth={1}
           />
           <circle
@@ -112,7 +123,7 @@ export function Overlay() {
             cy={layout.rotationKnobScreen.y}
             r={ROTATE_KNOB_RADIUS_PX}
             fill="#ffffff"
-            stroke={ACCENT}
+            stroke={boxColor}
             strokeWidth={1}
           />
           {layout.handlesScreen.map((p, i) => (
@@ -123,7 +134,7 @@ export function Overlay() {
               width={HANDLE_SIZE_PX}
               height={HANDLE_SIZE_PX}
               fill="#ffffff"
-              stroke={ACCENT}
+              stroke={boxColor}
               strokeWidth={1}
             />
           ))}
@@ -284,10 +295,12 @@ const HANDLE_DOT_R = 2.6
 function PathEditOverlay() {
   const pathEdit = useEditor((s) => s.ui.pathEdit)
   const nodes = useEditor((s) => s.document.nodes)
+  const root = useEditor((s) => s.document.root)
   const viewport = useEditor((s) => s.viewport)
   if (!pathEdit) return null
   const node = nodes[pathEdit.nodeId]
   if (!node || node.type !== 'path' || node.hidden) return null
+  const accent = layerColorOf({ nodes, root }, node.id) ?? ACCENT
   const world = worldTransform(nodes, node.id)
   const toScreen = (p: Vec2) => docToScreen(viewport, applyToPoint(world, p))
   const selected = new Set(pathEdit.anchorIds)
@@ -310,10 +323,10 @@ function PathEditOverlay() {
               y1={s.y}
               x2={hs.x}
               y2={hs.y}
-              stroke={ACCENT}
+              stroke={accent}
               strokeWidth={1}
             />,
-            <circle key={`${a.id}-dot-${end}`} cx={hs.x} cy={hs.y} r={HANDLE_DOT_R} fill={ACCENT} />,
+            <circle key={`${a.id}-dot-${end}`} cx={hs.x} cy={hs.y} r={HANDLE_DOT_R} fill={accent} />,
           )
         }
       }
@@ -324,8 +337,8 @@ function PathEditOverlay() {
           y={s.y - ANCHOR_SIZE / 2}
           width={ANCHOR_SIZE}
           height={ANCHOR_SIZE}
-          fill={isSel ? ACCENT : '#ffffff'}
-          stroke={ACCENT}
+          fill={isSel ? accent : '#ffffff'}
+          stroke={accent}
           strokeWidth={1}
           transform={a.type !== 'corner' ? `rotate(45 ${s.x} ${s.y})` : undefined}
         />,

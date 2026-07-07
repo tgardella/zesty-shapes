@@ -10,6 +10,7 @@ import { initPersistence } from './store/persistence'
 import { createToolManager, type ToolManager } from './tools'
 import { AlignPanel } from './ui/AlignPanel'
 import { AppearancePanel } from './ui/AppearancePanel'
+import { CanvasContextMenu } from './ui/CanvasContextMenu'
 import { PathfinderPanel } from './ui/PathfinderPanel'
 import { TextPanel } from './ui/TextPanel'
 import { LayersPanel } from './ui/LayersPanel'
@@ -50,12 +51,17 @@ export function App() {
         <Viewport manager={manager} />
       </div>
       <div className="sidebar">
-        <AppearancePanel />
-        <TextPanel />
-        <AlignPanel />
-        <PathfinderPanel />
+        {/* Contextual panels (appear only when applicable) scroll in the space
+            above the Layers panel, which the user resizes to taste. */}
+        <div className="sidebar-panels">
+          <AppearancePanel />
+          <TextPanel />
+          <AlignPanel />
+          <PathfinderPanel />
+        </div>
         <LayersPanel />
       </div>
+      <CanvasContextMenu />
     </div>
   )
 }

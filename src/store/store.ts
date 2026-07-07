@@ -20,6 +20,7 @@ import { useStore } from 'zustand'
 import { applyPatches, produceWithPatches, type Draft } from 'immer'
 import type { Document, NodeId, Style } from '../model/types'
 import { createDocument } from '../model/document'
+import { createInitialDocument, isLayerNode, nearestLayer, normalizeLayers, topLevelLayers } from '../model/layers'
 import { defaultStyle } from '../model/nodes'
 import { loadDocumentFromStorage } from '../model/serialize'
 import type { Vec2 } from '../geometry/vec2'
@@ -92,6 +93,12 @@ export interface UiState {
   toolSizes: Record<string, number>
   /** Pointer position in DOC space while over the canvas (size cursor). */
   pointer: Vec2 | null
+  /** Active layer new objects/imports land in (null = topmost layer). */
+  activeLayerId: NodeId | null
+  /** Items targeted for the Appearance panel (Layers panel target column). */
+  targetedIds: NodeId[]
+  /** Named selections saved from the Layers panel ("Save Selection"). */
+  savedSelections: { name: string; ids: NodeId[] }[]
 }
 
 export interface GridSettings {
@@ -124,6 +131,44 @@ export function effectiveScopeId(state: Pick<EditorState, 'document' | 'scopeId'
     return scopeId
   }
   return document.root
+}
+
+/**
+ * Where new art lands: the isolation scope when inside a group; otherwise the
+ * active layer (or the topmost layer). Falls back to the root for bare
+ * layer-free documents (tests) so the pure model contract is preserved.
+ */
+export function resolveInsertionParent(
+  state: Pick<EditorState, 'document' | 'scopeId' | 'ui'>,
+): NodeId {
+  const scope = effectiveScopeId(state)
+  if (scope !== state.document.root) return scope
+  const layers = topLevelLayers(state.document)
+  if (layers.length === 0) return state.document.root
+  // The active layer may be a top-level layer OR a sublayer — any layer group
+  // in the document is a valid insertion target.
+  const active = state.ui.activeLayerId
+  if (active && isLayerNode(state.document.nodes[active])) return active
+  return layers[layers.length - 1]!.id // topmost layer
+}
+
+/**
+ * When the selection becomes non-empty, make the primary object's NEAREST
+ * layer the active layer (Illustrator: selecting art targets its layer — new
+ * art and pastes then land there). Clearing the selection LEAVES the active
+ * layer intact, so clicking empty canvas never loses your working layer.
+ */
+function syncActiveLayerToSelection(
+  get: () => EditorState & EditorActions,
+  set: (partial: Partial<EditorState>) => void,
+  selection: NodeId[],
+): void {
+  if (selection.length === 0) return
+  const state = get()
+  const layer = nearestLayer(state.document, selection[0]!)
+  if (layer && state.ui.activeLayerId !== layer.id) {
+    set({ ui: { ...state.ui, activeLayerId: layer.id } })
+  }
 }
 
 export interface CommandOptions {
@@ -187,6 +232,13 @@ export interface EditorActions {
   setToolSize(toolId: string, size: number): void
   /** Pointer doc position for the size cursor; null when off-canvas. */
   setPointer(p: Vec2 | null): void
+
+  /** Active layer for new art; never undoable. */
+  setActiveLayer(id: NodeId | null): void
+  /** Appearance target items (Layers panel); never undoable. */
+  setTargeted(ids: NodeId[]): void
+  /** Persist a named selection; never undoable. */
+  saveSelection(name: string, ids: NodeId[]): void
 }
 
 export type EditorStore = EditorState & EditorActions
@@ -233,6 +285,9 @@ export function createEditorStore(initialDocument?: Document): EditorStoreApi {
         grid: { show: false, style: 'lines', unit: 'custom' },
         toolSizes: {},
         pointer: null,
+        activeLayerId: null,
+        targetedIds: [],
+        savedSelections: [],
       },
       history: emptyHistory(),
 
@@ -342,11 +397,15 @@ export function createEditorStore(initialDocument?: Document): EditorStoreApi {
       },
 
       setSelection(ids) {
-        set({ selection: sanitizeSelection(ids, get().document) })
+        const clean = sanitizeSelection(ids, get().document)
+        set({ selection: clean })
+        syncActiveLayerToSelection(get, set, clean)
       },
       addToSelection(ids) {
         const { selection, document } = get()
-        set({ selection: sanitizeSelection([...selection, ...ids], document) })
+        const clean = sanitizeSelection([...selection, ...ids], document)
+        set({ selection: clean })
+        syncActiveLayerToSelection(get, set, clean)
       },
       removeFromSelection(ids) {
         const drop = new Set(ids)
@@ -469,13 +528,33 @@ export function createEditorStore(initialDocument?: Document): EditorStoreApi {
         if (ui.pointer === p || (ui.pointer === null && p === null)) return
         set({ ui: { ...ui, pointer: p } })
       },
+      setActiveLayer(id) {
+        const ui = get().ui
+        if (ui.activeLayerId !== id) set({ ui: { ...ui, activeLayerId: id } })
+      },
+      setTargeted(ids) {
+        set({ ui: { ...get().ui, targetedIds: ids } })
+      },
+      saveSelection(name, ids) {
+        const ui = get().ui
+        const rest = ui.savedSelections.filter((s) => s.name !== name)
+        set({ ui: { ...ui, savedSelections: [...rest, { name, ids: [...ids] }] } })
+      },
     }
   })
 }
 
-/** The app-wide store. Boots from localStorage when available (autosave's counterpart). */
+/**
+ * The app-wide store. Boots from localStorage when available (autosave's
+ * counterpart) and normalizes into LAYERS — loaded documents predating the
+ * layer tier get wrapped into a default "Layer 1"; a fresh document starts
+ * with an empty Layer 1. Bare test stores (createEditorStore() with no
+ * argument) stay layer-free so the pure model contract is untouched.
+ */
 export const editorStore: EditorStoreApi = createEditorStore(
-  typeof window !== 'undefined' ? (loadDocumentFromStorage() ?? undefined) : undefined,
+  typeof window !== 'undefined'
+    ? normalizeLayers(loadDocumentFromStorage() ?? createInitialDocument())
+    : undefined,
 )
 
 /** React binding for the app-wide store. */

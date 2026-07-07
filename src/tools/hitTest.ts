@@ -40,27 +40,35 @@ export function isSelectableDeep(nodes: Record<NodeId, SceneNode>, id: NodeId): 
 }
 
 /**
- * Climb from any node to its top-level ancestor under `scopeId` (pure —
- * shared by DOM and geometric hit paths). When the node is NOT inside the
- * scope subtree, falls back to its child-of-root ancestor so out-of-scope
- * clicks still resolve (the Selection tool exits the scope in that case).
- * Returns null for the root/scope itself or unknown ids.
+ * Climb from any node to the top-level SELECTABLE ancestor under `scopeId`
+ * (pure — shared by DOM and geometric hit paths). LAYERS (and sublayers) are
+ * transparent to selection: they act as boundaries just like the root, so
+ * clicking an object selects the OBJECT (or the top-level group holding it
+ * inside its layer), never the layer itself. When the node isn't inside the
+ * scope subtree, falls back to the child of its nearest layer/root boundary so
+ * out-of-scope clicks still resolve. Returns null for root/scope/layers.
  */
 export function resolveTopLevel(doc: Document, leafId: NodeId, scopeId: NodeId): NodeId | null {
   const leaf = doc.nodes[leafId]
   if (!leaf || leafId === doc.root || leafId === scopeId) return null
-  // Walk up, remembering the child-of-scope and child-of-root candidates.
+  // Layers are not selectable art — a click that lands on a layer resolves to
+  // nothing (its children handle their own hits).
+  if (leaf.type === 'group' && leaf.isLayer) return null
   let node: SceneNode = leaf
   let childOfScope: NodeId | null = null
-  let childOfRoot: NodeId | null = null
+  let childOfBoundary: NodeId | null = null // child of the NEAREST layer or root
   while (node.parent !== null) {
-    if (node.parent === scopeId) childOfScope = node.id
-    if (node.parent === doc.root) childOfRoot = node.id
+    const isLayer = node.type === 'group' && node.isLayer === true
+    // A layer is never itself a selection result, even when it is a direct
+    // child of the scope (the root) — layers are transparent.
+    if (node.parent === scopeId && !isLayer) childOfScope = node.id
     const parent: SceneNode | undefined = doc.nodes[node.parent]
     if (!parent) return null
+    const parentIsBoundary = node.parent === doc.root || (parent.type === 'group' && parent.isLayer)
+    if (parentIsBoundary && childOfBoundary === null) childOfBoundary = node.id
     node = parent
   }
-  return childOfScope ?? childOfRoot
+  return childOfScope ?? childOfBoundary
 }
 
 /**
@@ -133,9 +141,30 @@ export function leafNodeAtPoint(doc: Document, point: Vec2, tolerance: number): 
 }
 
 /**
- * Children of `scopeId` matched by the doc-space marquee rect.
- * 'intersect': any geometry touches the rect. 'contain': the node's world
- * bbox lies entirely inside the rect.
+ * Top-level selectable art under `scopeId`, flattening LAYERS: layers and
+ * sublayers are transparent, so their children (objects and non-layer groups)
+ * become the selectable units. A regular group stays one unit.
+ */
+export function selectionRoots(doc: Document, scopeId: NodeId): NodeId[] {
+  const scope = doc.nodes[scopeId]
+  if (!scope || scope.type !== 'group') return []
+  const out: NodeId[] = []
+  const collect = (ids: NodeId[]): void => {
+    for (const id of ids) {
+      const n = doc.nodes[id]
+      if (!n) continue
+      if (n.type === 'group' && n.isLayer) collect(n.children)
+      else out.push(id)
+    }
+  }
+  collect(scope.children)
+  return out
+}
+
+/**
+ * Selectable art under `scopeId` matched by the doc-space marquee rect (layers
+ * flattened). 'intersect': any geometry touches the rect. 'contain': the
+ * node's world bbox lies entirely inside the rect.
  */
 export function nodesInDocRect(
   doc: Document,
@@ -144,9 +173,7 @@ export function nodesInDocRect(
 ): NodeId[] {
   const scopeId = opts.scopeId ?? doc.root
   const mode = opts.mode ?? 'intersect'
-  const scope = doc.nodes[scopeId]
-  if (!scope || scope.type !== 'group') return []
-  return scope.children.filter((id) => {
+  return selectionRoots(doc, scopeId).filter((id) => {
     if (!isSelectableDeep(doc.nodes, id)) return false
     if (mode === 'contain') return subtreeContainedInRect(doc, id, rect)
     return subtreeIntersectsRect(doc, id, rect)

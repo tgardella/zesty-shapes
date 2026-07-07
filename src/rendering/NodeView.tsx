@@ -22,6 +22,7 @@ import { isIdentity, toSvgTransform } from '../geometry/matrix'
 import { subpathsToPathData } from '../geometry/pathData'
 import type { GradientPaint, NodeId, SceneNode } from '../model/types'
 import { toSubPaths } from '../model/nodes'
+import { imageDimFactor } from '../model/layers'
 import { regionsToSubPaths } from '../model/booleanOps'
 import { outlineStroke } from '../model/strokeOutline'
 import { layoutText } from '../model/textLayout'
@@ -114,19 +115,40 @@ function ShapeView({
     case 'text':
       return <TextView node={node} transform={transform} opacity={opacity} style={style} />
     case 'image':
-      return (
-        <image
-          data-node-id={node.id}
-          transform={transform}
-          opacity={opacity}
-          style={style}
-          href={node.href}
-          width={node.w}
-          height={node.h}
-          preserveAspectRatio="none"
-        />
-      )
+      return <ImageView node={node} transform={transform} opacity={opacity} style={style} />
   }
+}
+
+/**
+ * Placed raster image. Its effective opacity multiplies the node opacity by
+ * the owning layer's "Dim Images" factor (also driven by Template layers), so
+ * dimmed layers fade their photos for tracing without altering the model.
+ */
+function ImageView({
+  node,
+  transform,
+  opacity,
+  style,
+}: {
+  node: Extract<SceneNode, { type: 'image' }>
+  transform: string | undefined
+  opacity: number | undefined
+  style: CSSProperties | undefined
+}) {
+  const dim = useEditor((s) => imageDimFactor(s.document, node.id))
+  const eff = (opacity ?? 1) * dim
+  return (
+    <image
+      data-node-id={node.id}
+      transform={transform}
+      opacity={eff < 1 ? eff : undefined}
+      style={style}
+      href={node.href}
+      width={node.w}
+      height={node.h}
+      preserveAspectRatio="none"
+    />
+  )
 }
 
 /**

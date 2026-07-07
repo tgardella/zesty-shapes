@@ -68,6 +68,9 @@ export function AlignPanel() {
   const distribute = (axis: 'h' | 'v') =>
     cmdDistributeNodes(editorStore, editorStore.getState().selection, axis)
 
+  // Contextual: alignment needs at least two objects to be meaningful.
+  if (selectionCount < 2) return null
+
   return (
     <div className="panel">
       <div className="panel-title">Align</div>

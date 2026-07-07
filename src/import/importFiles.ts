@@ -151,6 +151,34 @@ export async function importFile(store: EditorStoreApi, file: File): Promise<boo
 }
 
 /**
+ * Paste from the SYSTEM clipboard on demand (used by the canvas context menu's
+ * "Paste", where there's no ClipboardEvent to read). Reads images/SVG via the
+ * async Clipboard API; falls back to the in-app clipboard when the system
+ * clipboard has no importable content or permission is denied.
+ */
+export async function pasteFromSystemClipboard(store: EditorStoreApi): Promise<boolean> {
+  try {
+    if (navigator.clipboard?.read) {
+      const items = await navigator.clipboard.read()
+      for (const item of items) {
+        const imgType = item.types.find((t) => t.startsWith('image/'))
+        if (imgType) {
+          const blob = await item.getType(imgType)
+          if (await importImageBlob(store, blob, 'Pasted Image')) return true
+        }
+        if (item.types.includes('text/plain')) {
+          const text = await (await item.getType('text/plain')).text()
+          if (looksLikeSvg(text) && importSvgText(store, text, 'Pasted SVG')) return true
+        }
+      }
+    }
+  } catch {
+    // Permission denied / unsupported — fall back to the in-app clipboard.
+  }
+  return pasteClipboard(store).length > 0
+}
+
+/**
  * Wire paste (SVG text, image blobs, files) and drag-drop onto the window.
  * Returns an unsubscribe function.
  */

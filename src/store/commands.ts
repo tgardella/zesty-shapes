@@ -14,7 +14,7 @@ import { applyToVector, invert } from '../geometry/matrix'
 import type { Vec2 } from '../geometry/vec2'
 import type { BBox } from '../geometry/bbox'
 import { localBBoxOfNode, transformBBox } from '../geometry/bbox'
-import type { EditorStoreApi } from './store'
+import { resolveInsertionParent, type EditorStoreApi } from './store'
 import { worldTransform } from './worldTransform'
 
 export interface AddNodeOptions {
@@ -25,9 +25,12 @@ export interface AddNodeOptions {
 }
 
 export function cmdAddNode(store: EditorStoreApi, node: SceneNode, opts: AddNodeOptions = {}): void {
+  // New art lands in the active layer (or isolation scope) unless a parent is
+  // named. Layer-free documents fall back to the root (resolveInsertionParent).
+  const parentId = opts.parentId ?? resolveInsertionParent(store.getState())
   store.getState().applyCommand(
     `Add ${node.name}`,
-    (doc) => addNode(doc, node, opts.parentId, opts.index),
+    (doc) => addNode(doc, node, parentId, opts.index),
     opts.select ? { selectAfter: [node.id] } : undefined,
   )
 }
