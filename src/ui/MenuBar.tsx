@@ -20,7 +20,7 @@ import {
   cmdGroupNodes,
   cmdUngroupNodes,
 } from '../store/commands'
-import { cmdBlend } from '../store/blendCommands'
+import { cmdBlend, cmdExpandBlend, liveBlendIds } from '../store/blendCommands'
 import { cmdConvertToMesh } from '../store/meshCommands'
 import { cmdNewDocument } from '../store/layerCommands'
 import { editorStore, useEditor } from '../store/store'
@@ -81,6 +81,7 @@ export function MenuBar({ manager }: { manager: ToolManager }) {
       return n?.type === 'group' && !n.isLayer
     }),
   )
+  const hasLiveBlend = useEditor((s) => liveBlendIds(editorStore, s.selection).length > 0)
 
   useEffect(() => {
     if (open === null) return
@@ -185,6 +186,11 @@ export function MenuBar({ manager }: { manager: ToolManager }) {
             const [a, b] = store.getState().selection
             if (a && b) cmdBlend(store, a, b)
           },
+        },
+        {
+          label: 'Expand Blend',
+          disabled: !hasLiveBlend,
+          action: () => cmdExpandBlend(store, store.getState().selection),
         },
       ],
     },

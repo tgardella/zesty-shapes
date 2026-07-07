@@ -5,11 +5,18 @@
 
 import { describe, expect, it } from 'vitest'
 import { createEditorStore } from './store'
-import { cmdAddNode } from './commands'
-import { cmdBlend } from './blendCommands'
+import { cmdAddNode, cmdMoveNodesBy } from './commands'
+import { cmdBlend, cmdExpandBlend, cmdSetBlendSteps } from './blendCommands'
+import { blendStepGeometry } from '../model/blend'
 import { cmdBlobPaint } from './brushCommands'
 import { cmdConvertToMesh, cmdMeshAddDivision, cmdMeshMovePoint } from './meshCommands'
 import { cmdCreateSymbolSet, cmdSprayStamp } from './sprayCommands'
+import {
+  cmdCreateSymbol,
+  cmdDeleteSymbol,
+  cmdRenameSymbol,
+  cmdStampSymbol,
+} from './symbolCommands'
 import { createInitialDocument, topLevelLayers } from '../model/layers'
 import { createRectNode } from '../model/nodes'
 import { documentFromJSON, documentToJSON, documentToSVG } from '../model/serialize'
@@ -23,32 +30,72 @@ function layeredStore() {
 const red: SolidPaint = { type: 'solid', color: { r: 255, g: 0, b: 0, a: 1 } }
 const blue: SolidPaint = { type: 'solid', color: { r: 0, g: 0, b: 255, a: 1 } }
 
-describe('cmdBlend', () => {
-  it('groups the originals with N interpolated steps, one undo step', () => {
+describe('cmdBlend (live)', () => {
+  function blendedStore() {
     const store = layeredStore()
     const a = createRectNode({ x: 0, y: 0, w: 20, h: 20 })
     const b = createRectNode({ x: 0, y: 0, w: 20, h: 20 }, { transform: translate(100, 0) })
     cmdAddNode(store, a)
     cmdAddNode(store, b)
-    const groupId = cmdBlend(store, a.id, b.id, 3)
-    expect(groupId).toBeTruthy()
+    const groupId = cmdBlend(store, a.id, b.id, 3)!
+    return { store, a, b, groupId }
+  }
+
+  it('creates a LIVE blend group holding only the endpoints', () => {
+    const { store, a, b, groupId } = blendedStore()
     const doc = store.getState().document
-    const group = doc.nodes[groupId!] as GroupNode
-    expect(group.type).toBe('group')
+    const group = doc.nodes[groupId] as GroupNode
     expect(group.name).toBe('Blend')
-    expect(group.children).toHaveLength(5) // a + 3 steps + b
-    expect(group.children[0]).toBe(a.id)
-    expect(group.children[4]).toBe(b.id)
-    // Steps are paths between the two originals.
-    const step = doc.nodes[group.children[2]!]!
-    expect(step.type).toBe('path')
+    expect(group.blend).toEqual({ steps: 3 })
+    expect(group.children).toEqual([a.id, b.id])
+    // Steps derive on demand.
+    expect(blendStepGeometry(doc.nodes, groupId)).toHaveLength(3)
     // ONE undo restores both originals to the layer.
     store.getState().undo()
     const after = store.getState().document
-    expect(after.nodes[groupId!]).toBeUndefined()
+    expect(after.nodes[groupId]).toBeUndefined()
     expect(after.nodes[a.id]!.parent).toBe(topLevelLayers(after)[0]!.id)
-    // Undo restores the pre-command selection (nothing was selected).
     expect(store.getState().selection).toEqual([])
+  })
+
+  it('re-derives steps when an endpoint moves (live update)', () => {
+    const { store, b, groupId } = blendedStore()
+    const before = blendStepGeometry(store.getState().document.nodes, groupId)
+    const beforeX = before[1]!.regions[0]![0]![0]!.x
+    cmdMoveNodesBy(store, [b.id], { x: 200, y: 0 })
+    const after = blendStepGeometry(store.getState().document.nodes, groupId)
+    const afterX = after[1]!.regions[0]![0]![0]!.x
+    expect(afterX).toBeGreaterThan(beforeX + 50) // middle step followed the endpoint
+  })
+
+  it('cmdSetBlendSteps retunes the step count', () => {
+    const { store, groupId } = blendedStore()
+    cmdSetBlendSteps(store, [groupId], 7)
+    const doc = store.getState().document
+    expect((doc.nodes[groupId] as GroupNode).blend).toEqual({ steps: 7 })
+    expect(blendStepGeometry(doc.nodes, groupId)).toHaveLength(7)
+  })
+
+  it('cmdExpandBlend bakes the steps into real nodes and drops the marker', () => {
+    const { store, a, b, groupId } = blendedStore()
+    const created = cmdExpandBlend(store, [groupId])
+    expect(created).toHaveLength(3)
+    const doc = store.getState().document
+    const group = doc.nodes[groupId] as GroupNode
+    expect(group.blend).toBeUndefined()
+    expect(group.children).toHaveLength(5)
+    expect(group.children[0]).toBe(a.id)
+    expect(group.children[4]).toBe(b.id)
+    expect(doc.nodes[group.children[2]!]!.type).toBe('path')
+    // Once expanded there is nothing live left to derive.
+    expect(blendStepGeometry(doc.nodes, groupId)).toHaveLength(0)
+  })
+
+  it('exports the derived steps into the SVG', () => {
+    const { store } = blendedStore()
+    const svg = documentToSVG(store.getState().document)
+    // 2 endpoint rects + 3 derived step paths inside the blend group.
+    expect(svg.match(/fill-rule="evenodd"/g)).toHaveLength(3)
   })
 
   it('returns null for missing or degenerate operands', () => {
@@ -135,6 +182,56 @@ describe('gradient mesh commands', () => {
     const mesh = roundTripped.nodes[rect.id] as MeshNode
     expect(mesh.type).toBe('mesh')
     expect(mesh.points).toHaveLength(4)
+  })
+})
+
+describe('symbol library', () => {
+  it('cmdCreateSymbol snapshots the selection without touching the canvas', () => {
+    const store = layeredStore()
+    const rect = createRectNode({ x: 0, y: 0, w: 10, h: 10 })
+    cmdAddNode(store, rect, { select: true })
+    const symbolId = cmdCreateSymbol(store)!
+    const doc = store.getState().document
+    expect(doc.symbols).toHaveLength(1)
+    const def = doc.symbols![0]!
+    expect(def.id).toBe(symbolId)
+    expect(def.rootIds).toHaveLength(1)
+    // Fresh ids: the snapshot never aliases live nodes.
+    expect(def.rootIds[0]).not.toBe(rect.id)
+    expect(doc.nodes[rect.id]).toBeDefined()
+    // Round-trips through JSON.
+    const round = documentFromJSON(documentToJSON(doc))
+    expect(round.symbols![0]!.name).toBe(def.name)
+  })
+
+  it('cmdStampSymbol places an instance centered on the doc point', () => {
+    const store = layeredStore()
+    const rect = createRectNode({ x: 0, y: 0, w: 10, h: 10 })
+    cmdAddNode(store, rect, { select: true })
+    const symbolId = cmdCreateSymbol(store)!
+    const [placed] = cmdStampSymbol(store, symbolId, {
+      docPoint: { x: 100, y: 100 },
+      rotation: 0,
+      scale: 1,
+    })
+    const doc = store.getState().document
+    const node = doc.nodes[placed!]!
+    expect(node.parent).toBe(topLevelLayers(doc)[0]!.id)
+    expect(node.transform[4]).toBeCloseTo(95)
+    expect(node.transform[5]).toBeCloseTo(95)
+  })
+
+  it('rename and delete edit the library (undoably)', () => {
+    const store = layeredStore()
+    const rect = createRectNode({ x: 0, y: 0, w: 10, h: 10 })
+    cmdAddNode(store, rect, { select: true })
+    const symbolId = cmdCreateSymbol(store)!
+    cmdRenameSymbol(store, symbolId, 'Leaf')
+    expect(store.getState().document.symbols![0]!.name).toBe('Leaf')
+    cmdDeleteSymbol(store, symbolId)
+    expect(store.getState().document.symbols).toHaveLength(0)
+    store.getState().undo()
+    expect(store.getState().document.symbols![0]!.name).toBe('Leaf')
   })
 })
 

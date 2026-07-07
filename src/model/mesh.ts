@@ -57,6 +57,49 @@ function bilerpColor(c00: RGBA, c10: RGBA, c01: RGBA, c11: RGBA, u: number, v: n
   return lerpColor(lerpColor(c00, c10, u), lerpColor(c01, c11, u), v)
 }
 
+// ---------------------------------------------------------------------------
+// Curved surface: tensor-product Catmull-Rom over the grid points.
+// Approximates Illustrator's bezier mesh lines without handle UI — dragging a
+// point warps its neighborhood SMOOTHLY. Border control points clamp
+// (duplicate), so a straight-edged grid stays exactly straight: with
+// collinear controls every CR term is a multiple of the segment direction.
+// ---------------------------------------------------------------------------
+
+function crVec(p0: Vec2, p1: Vec2, p2: Vec2, p3: Vec2, t: number): Vec2 {
+  const t2 = t * t
+  const t3 = t2 * t
+  const w0 = -0.5 * t3 + t2 - 0.5 * t
+  const w1 = 1.5 * t3 - 2.5 * t2 + 1
+  const w2 = -1.5 * t3 + 2 * t2 + 0.5 * t
+  const w3 = 0.5 * t3 - 0.5 * t2
+  return {
+    x: w0 * p0.x + w1 * p1.x + w2 * p2.x + w3 * p3.x,
+    y: w0 * p0.y + w1 * p1.y + w2 * p2.y + w3 * p3.y,
+  }
+}
+
+function clampIndex(v: number, max: number): number {
+  return v < 0 ? 0 : v > max ? max : v
+}
+
+/** Point on horizontal grid line `r` at local `s` across cell column `c`. */
+export function meshRowPoint(node: MeshNode, r: number, c: number, s: number): Vec2 {
+  const at = (cc: number): Vec2 => node.points[meshIndex(node, r, clampIndex(cc, node.cols))]!.p
+  return crVec(at(c - 1), at(c), at(c + 1), at(c + 2), s)
+}
+
+/** Point on vertical grid line `c` at local `t` across cell row `r`. */
+export function meshColPoint(node: MeshNode, c: number, r: number, t: number): Vec2 {
+  const at = (rr: number): Vec2 => node.points[meshIndex(node, clampIndex(rr, node.rows), c)]!.p
+  return crVec(at(r - 1), at(r), at(r + 1), at(r + 2), t)
+}
+
+/** Smooth surface position inside cell (r, c) at local (s, t). */
+export function meshSurfacePoint(node: MeshNode, r: number, c: number, s: number, t: number): Vec2 {
+  const q = (rr: number): Vec2 => meshRowPoint(node, clampIndex(rr, node.rows), c, s)
+  return crVec(q(r - 1), q(r), q(r + 1), q(r + 2), t)
+}
+
 /**
  * Convert a shape/path into a fresh 1x1 mesh, PRESERVING id / transform /
  * tree fields (mirrors convertToPath). Corner colors seed from the solid
@@ -143,8 +186,9 @@ export interface MeshQuad {
 
 /**
  * The flat-shaded sub-quads approximating the smooth mesh (LOCAL space).
- * Each quad also gets stroked with its own color at seamWidth to hide
- * antialiasing seams between neighbors.
+ * Positions follow the CURVED Catmull-Rom surface (meshSurfacePoint); colors
+ * interpolate bilinearly within their cell. Each quad also gets stroked with
+ * its own color at seamWidth to hide antialiasing seams between neighbors.
  */
 export function meshQuads(node: MeshNode, subdiv: number = MESH_SUBDIV): MeshQuad[] {
   const quads: MeshQuad[] = []
@@ -155,26 +199,26 @@ export function meshQuads(node: MeshNode, subdiv: number = MESH_SUBDIV): MeshQua
       const p10 = node.points[meshIndex(node, r, c + 1)]!
       const p01 = node.points[meshIndex(node, r + 1, c)]!
       const p11 = node.points[meshIndex(node, r + 1, c + 1)]!
+      // Shared sample lattice so neighboring sub-quads seam exactly.
+      const lattice: Vec2[][] = []
+      for (let j = 0; j <= subdiv; j++) {
+        const rowPts: Vec2[] = []
+        for (let i = 0; i <= subdiv; i++) {
+          rowPts.push(meshSurfacePoint(node, r, c, i / subdiv, j / subdiv))
+        }
+        lattice.push(rowPts)
+      }
       for (let i = 0; i < subdiv; i++) {
         for (let j = 0; j < subdiv; j++) {
-          const u0 = i / subdiv
-          const u1 = (i + 1) / subdiv
-          const v0 = j / subdiv
-          const v1 = (j + 1) / subdiv
           quads.push({
-            pts: [
-              bilerpVec(p00.p, p10.p, p01.p, p11.p, u0, v0),
-              bilerpVec(p00.p, p10.p, p01.p, p11.p, u1, v0),
-              bilerpVec(p00.p, p10.p, p01.p, p11.p, u1, v1),
-              bilerpVec(p00.p, p10.p, p01.p, p11.p, u0, v1),
-            ],
+            pts: [lattice[j]![i]!, lattice[j]![i + 1]!, lattice[j + 1]![i + 1]!, lattice[j + 1]![i]!],
             color: bilerpColor(
               p00.color,
               p10.color,
               p01.color,
               p11.color,
-              (u0 + u1) / 2,
-              (v0 + v1) / 2,
+              (i + 0.5) / subdiv,
+              (j + 0.5) / subdiv,
             ),
           })
         }
@@ -182,6 +226,30 @@ export function meshQuads(node: MeshNode, subdiv: number = MESH_SUBDIV): MeshQua
     }
   }
   return quads
+}
+
+/**
+ * The grid lines of the CURVED surface as local-space polylines (rows first,
+ * then columns) — the overlay draws these so the on-canvas grid matches the
+ * painted surface exactly.
+ */
+export function meshGridLines(node: MeshNode, samples = 6): Vec2[][] {
+  const lines: Vec2[][] = []
+  for (let r = 0; r <= node.rows; r++) {
+    const line: Vec2[] = [node.points[meshIndex(node, r, 0)]!.p]
+    for (let c = 0; c < node.cols; c++) {
+      for (let k = 1; k <= samples; k++) line.push(meshRowPoint(node, r, c, k / samples))
+    }
+    lines.push(line)
+  }
+  for (let c = 0; c <= node.cols; c++) {
+    const line: Vec2[] = [node.points[meshIndex(node, 0, c)]!.p]
+    for (let r = 0; r < node.rows; r++) {
+      for (let k = 1; k <= samples; k++) line.push(meshColPoint(node, c, r, k / samples))
+    }
+    lines.push(line)
+  }
+  return lines
 }
 
 /** Seam-hiding stroke width for the sub-quads, from the mesh's typical cell size. */
@@ -285,37 +353,41 @@ export function meshAddDivision(node: MeshNode, hit: MeshCellHit, color?: RGBA):
   const u = Math.min(1 - EDGE, Math.max(EDGE, hit.u))
   const v = Math.min(1 - EDGE, Math.max(EDGE, hit.v))
 
-  // Insert the new COLUMN at (col + u): every row gains one point between
-  // columns col and col+1, interpolated along that row's cell edge span.
+  // Insert the new COLUMN at (col + u): every row gains one point ON its
+  // curved row line (meshRowPoint), color-lerped between its neighbors.
+  // Sample all positions BEFORE splicing — the spline reads the old grid.
   const oldCols = node.cols
   const colAt = hit.col
+  const columnInserts: MeshPoint[] = []
+  for (let r = 0; r <= node.rows; r++) {
+    const a = node.points[r * (oldCols + 1) + colAt]!
+    const b = node.points[r * (oldCols + 1) + colAt + 1]!
+    columnInserts.push({ p: meshRowPoint(node, r, colAt, u), color: lerpColor(a.color, b.color, u) })
+  }
   const newPoints: MeshPoint[] = []
   for (let r = 0; r <= node.rows; r++) {
     for (let c = 0; c <= oldCols; c++) {
       newPoints.push(node.points[r * (oldCols + 1) + c]!)
-      if (c === colAt) {
-        const a = node.points[r * (oldCols + 1) + c]!
-        const b = node.points[r * (oldCols + 1) + c + 1]!
-        newPoints.push({ p: lerpVec(a.p, b.p, u), color: lerpColor(a.color, b.color, u) })
-      }
+      if (c === colAt) newPoints.push(columnInserts[r]!)
     }
   }
   node.cols = oldCols + 1
   node.points = newPoints
 
-  // Insert the new ROW at (row + v) against the widened grid.
+  // Insert the new ROW at (row + v) against the widened grid, again ON the
+  // curved column lines.
   const cols1 = node.cols + 1
   const rowAt = hit.row
+  const rowInserts: MeshPoint[] = []
+  for (let c = 0; c < cols1; c++) {
+    const a = node.points[rowAt * cols1 + c]!
+    const b = node.points[(rowAt + 1) * cols1 + c]!
+    rowInserts.push({ p: meshColPoint(node, c, rowAt, v), color: lerpColor(a.color, b.color, v) })
+  }
   const withRow: MeshPoint[] = []
   for (let r = 0; r <= node.rows; r++) {
     for (let c = 0; c < cols1; c++) withRow.push(node.points[r * cols1 + c]!)
-    if (r === rowAt) {
-      for (let c = 0; c < cols1; c++) {
-        const a = node.points[r * cols1 + c]!
-        const b = node.points[(r + 1) * cols1 + c]!
-        withRow.push({ p: lerpVec(a.p, b.p, v), color: lerpColor(a.color, b.color, v) })
-      }
-    }
+    if (r === rowAt) withRow.push(...rowInserts)
   }
   node.rows += 1
   node.points = withRow

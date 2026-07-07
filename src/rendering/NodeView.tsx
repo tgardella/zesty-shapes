@@ -22,6 +22,7 @@ import { isIdentity, toSvgTransform } from '../geometry/matrix'
 import { subpathsToPathData } from '../geometry/pathData'
 import type { GradientPaint, NodeId, SceneNode } from '../model/types'
 import { toSubPaths } from '../model/nodes'
+import { blendStepGeometry } from '../model/blend'
 import { imageDimFactor } from '../model/layers'
 import { meshQuads, meshSeamWidth } from '../model/mesh'
 import { regionsToSubPaths } from '../model/booleanOps'
@@ -53,6 +54,15 @@ export const NodeView = memo(function NodeView({ id }: { id: NodeId }) {
     node.blendMode !== 'normal' ? { mixBlendMode: node.blendMode } : undefined
 
   if (node.type === 'group') {
+    if (node.blend && node.children.length === 2) {
+      return (
+        <g data-node-id={id} transform={transform} opacity={opacity} style={style}>
+          <NodeView id={node.children[0]!} />
+          <BlendStepsView groupId={id} />
+          <NodeView id={node.children[1]!} />
+        </g>
+      )
+    }
     return (
       <g data-node-id={id} transform={transform} opacity={opacity} style={style}>
         {node.children.map((childId) => (
@@ -120,6 +130,30 @@ function ShapeView({
     case 'mesh':
       return <MeshView node={node} transform={transform} opacity={opacity} style={style} />
   }
+}
+
+/**
+ * LIVE blend steps: derived from the group's two endpoints on every render
+ * (model/blend.blendStepGeometry — the exporter emits the same construction).
+ * Subscribes to the WHOLE nodes map so any edit inside either endpoint
+ * re-blends; blends are rare enough that the broad subscription is cheap.
+ * Steps carry the GROUP's data-node-id, so clicking one selects the blend.
+ */
+function BlendStepsView({ groupId }: { groupId: NodeId }) {
+  const nodes = useEditor((s) => s.document.nodes)
+  const steps = blendStepGeometry(nodes, groupId)
+  return (
+    <g data-node-id={groupId}>
+      {steps.map((step, i) => (
+        <path
+          key={i}
+          d={subpathsToPathData(regionsToSubPaths(step.regions))}
+          fillRule="evenodd"
+          {...svgPaintProps(step.style, resolveDefId)}
+        />
+      ))}
+    </g>
+  )
 }
 
 /**

@@ -1,9 +1,10 @@
 /**
- * Symbol Sprayer (Shift+S): sprays copies of a "symbol" along the drag. The
- * symbol is the selection at spray time (and is remembered, so you can spray
- * again after deselecting). Stamps land in a fresh "Symbol Set" group with
- * random position/rotation/scale jitter inside the spray radius (the Size
- * selector). One drag = ONE 'Spray Symbols' undo step.
+ * Symbol Sprayer (Shift+S): sprays copies of a symbol along the drag. The
+ * symbol is the Symbols panel's ACTIVE symbol when one is highlighted;
+ * otherwise the selection at spray time (remembered, so you can spray again
+ * after deselecting). Stamps land in a fresh "Symbol Set" group with random
+ * position/rotation/scale jitter inside the spray radius (the Size selector).
+ * One drag = ONE 'Spray Symbols' undo step.
  */
 
 import type { Vec2 } from '../geometry/vec2'
@@ -19,6 +20,8 @@ export class SymbolSprayerTool implements Tool {
 
   /** Remembered symbol sources (survives deselection between sprays). */
   private symbolIds: NodeId[] = []
+  /** Library symbol being sprayed this gesture (null = selection snapshot). */
+  private librarySymbolId: string | null = null
   /** Symbol-set groups this tool created (their selection isn't a symbol). */
   private readonly ownSets = new Set<NodeId>()
   private groupId: NodeId | null = null
@@ -43,21 +46,23 @@ export class SymbolSprayerTool implements Tool {
     const radius = ctx.toolSize.get('symbol-sprayer') / 2
     const angle = Math.random() * Math.PI * 2
     const r = Math.random() * radius * 0.5
-    ctx.commands.sprayStamp(
-      this.symbolIds,
-      {
-        docPoint: { x: at.x + Math.cos(angle) * r, y: at.y + Math.sin(angle) * r },
-        rotation: (Math.random() - 0.5) * 0.6,
-        scale: 0.75 + Math.random() * 0.5,
-      },
-      this.groupId,
-    )
+    const stamp = {
+      docPoint: { x: at.x + Math.cos(angle) * r, y: at.y + Math.sin(angle) * r },
+      rotation: (Math.random() - 0.5) * 0.6,
+      scale: 0.75 + Math.random() * 0.5,
+    }
+    if (this.librarySymbolId) {
+      ctx.commands.stampSymbol(this.librarySymbolId, stamp, this.groupId)
+    } else {
+      ctx.commands.sprayStamp(this.symbolIds, stamp, this.groupId)
+    }
     this.lastStamp = at
   }
 
   onPointerDown(e: ToolPointerEvent, ctx: ToolContext): void {
-    const symbol = this.resolveSymbol(ctx)
-    if (symbol.length === 0) return
+    // The Symbols panel's active symbol wins; else spray the selection.
+    this.librarySymbolId = ctx.symbols.activeId()
+    if (!this.librarySymbolId && this.resolveSymbol(ctx).length === 0) return
     ctx.transaction.begin('Spray Symbols')
     this.groupId = ctx.commands.createSymbolSet()
     this.ownSets.add(this.groupId)

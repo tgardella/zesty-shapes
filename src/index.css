@@ -220,6 +220,7 @@ body {
 }
 
 .tool-btn {
+  position: relative;
   width: 36px;
   height: 36px;
   display: grid;
@@ -229,6 +230,72 @@ body {
   background: transparent;
   color: #aab0c0;
   cursor: pointer;
+}
+
+/* Corner triangle marking a click+hold tool group. */
+.tool-flyout-mark {
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  width: 0;
+  height: 0;
+  border-left: 4px solid transparent;
+  border-bottom: 4px solid currentColor;
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+/* Click+hold flyout listing a slot's tools. */
+.tool-flyout {
+  position: fixed;
+  min-width: 170px;
+  background: #26282f;
+  border: 1px solid #3d414b;
+  border-radius: 8px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  padding: 4px;
+  z-index: 62;
+}
+
+.tool-flyout button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  border: none;
+  background: transparent;
+  color: #dfe1ea;
+  font-size: 12.5px;
+  text-align: left;
+  padding: 5px 8px;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.tool-flyout button:hover {
+  background: #3b82f6;
+  color: #ffffff;
+}
+
+.tool-flyout button.active {
+  background: #2f3f5e;
+}
+
+.tool-flyout button.active:hover {
+  background: #3b82f6;
+}
+
+.tool-flyout-name {
+  flex: 1;
+}
+
+.tool-flyout-shortcut {
+  color: #8b92a5;
+  font-size: 11px;
+}
+
+.tool-flyout button:hover .tool-flyout-shortcut {
+  color: #dbe6ff;
 }
 
 .tool-btn:hover {
@@ -445,6 +512,116 @@ body {
   letter-spacing: 0.06em;
   color: #8b92a5;
   margin-bottom: 8px;
+}
+
+/* -- symbols panel -- */
+
+.symbols-panel .panel-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.symbols-new {
+  border: none;
+  background: #33363f;
+  color: #c6cbd8;
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+}
+
+.symbols-new:hover:not(:disabled) {
+  background: #3b82f6;
+  color: #ffffff;
+}
+
+.symbols-new:disabled {
+  color: #565b68;
+  cursor: default;
+}
+
+.symbols-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.symbol-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 4px;
+  border-radius: 5px;
+  cursor: pointer;
+  color: #dfe1ea;
+}
+
+.symbol-row:hover {
+  background: #2b2e38;
+}
+
+.symbol-row.active {
+  background: #2f3f5e;
+  box-shadow: inset 2px 0 0 #3b82f6;
+}
+
+.symbol-thumb {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  background: #ffffff;
+  border: 1px solid #3d414b;
+  border-radius: 4px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+
+.symbol-thumb img {
+  max-width: 100%;
+  max-height: 100%;
+}
+
+.symbol-name {
+  flex: 1;
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.symbol-rename {
+  flex: 1;
+  background: #1b1d23;
+  border: 1px solid #3b82f6;
+  border-radius: 4px;
+  color: #ffffff;
+  font-size: 12px;
+  padding: 2px 4px;
+  min-width: 0;
+}
+
+.symbol-action {
+  border: none;
+  background: transparent;
+  color: #8b92a5;
+  font-size: 11px;
+  cursor: pointer;
+  border-radius: 4px;
+  padding: 2px 5px;
+}
+
+.symbol-action:hover {
+  background: #3d414b;
+  color: #ffffff;
+}
+
+.symbol-delete:hover {
+  background: #7f1d1d;
 }
 
 .align-grid {

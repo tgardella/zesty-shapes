@@ -101,7 +101,14 @@ export interface UiState {
   targetedIds: NodeId[]
   /** Named selections saved from the Layers panel ("Save Selection"). */
   savedSelections: { name: string; ids: NodeId[] }[]
+  /** Symbol the Symbols panel highlighted (the sprayer sprays it). */
+  activeSymbolId: string | null
+  /** Paintbrush (B) stroke shape preset. */
+  brushPreset: BrushPreset
 }
+
+/** Paintbrush stroke shapes: tapered ends, uniform, or angled-nib calligraphy. */
+export type BrushPreset = 'taper' | 'uniform' | 'calligraphic'
 
 export interface GridSettings {
   /** Draw the grid (lines or dots) under the scene. */
@@ -217,6 +224,8 @@ export interface EditorActions {
   setCurrentStyle(style: Style): void
   setWidthEdit(id: NodeId | null): void
   setMeshEdit(edit: { nodeId: NodeId; pointIndex: number } | null): void
+  setActiveSymbol(id: string | null): void
+  setBrushPreset(preset: BrushPreset): void
 
   /** Boolean-tool previews (Shape Builder face, Knife/Eraser trail); never undoable. */
   setFacePreview(region: Vec2[][] | null): void
@@ -292,6 +301,8 @@ export function createEditorStore(initialDocument?: Document): EditorStoreApi {
         activeLayerId: null,
         targetedIds: [],
         savedSelections: [],
+        activeSymbolId: null,
+        brushPreset: 'taper',
       },
       history: emptyHistory(),
 
@@ -493,6 +504,14 @@ export function createEditorStore(initialDocument?: Document): EditorStoreApi {
         const ui = get().ui
         if (ui.meshEdit === edit || (ui.meshEdit === null && edit === null)) return
         set({ ui: { ...ui, meshEdit: edit } })
+      },
+      setActiveSymbol(id) {
+        const ui = get().ui
+        if (ui.activeSymbolId !== id) set({ ui: { ...ui, activeSymbolId: id } })
+      },
+      setBrushPreset(preset) {
+        const ui = get().ui
+        if (ui.brushPreset !== preset) set({ ui: { ...ui, brushPreset: preset } })
       },
       setFacePreview(region) {
         const ui = get().ui

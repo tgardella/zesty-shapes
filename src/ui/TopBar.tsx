@@ -4,7 +4,8 @@
  * bar (ui/MenuBar.tsx), like Illustrator.
  */
 
-import { editorStore, useEditor } from '../store/store'
+import { editorStore, useEditor, type BrushPreset } from '../store/store'
+import { cmdSetBlendSteps } from '../store/blendCommands'
 import { TOOL_SIZE_SPECS } from '../tools/toolSizes'
 
 /** Grid spacing presets in doc units (CSS px): 96/inch, ~37.8/cm. */
@@ -26,9 +27,17 @@ export function TopBar() {
   const gridSize = useEditor((s) => s.ui.gridSize)
   const activeToolId = useEditor((s) => s.tool.activeToolId)
   const toolSize = useEditor((s) => s.ui.toolSizes[s.tool.activeToolId])
+  const brushPreset = useEditor((s) => s.ui.brushPreset)
 
   const zoomBy = (factor: number) => editorStore.getState().zoomAtPoint(viewportCenter(), factor)
   const sizeSpec = TOOL_SIZE_SPECS[activeToolId]
+
+  const setSize = (v: number): void => {
+    const state = editorStore.getState()
+    state.setToolSize(activeToolId, v)
+    // With the Blend tool, "Steps" also retunes any selected LIVE blends.
+    if (activeToolId === 'blend') cmdSetBlendSteps(editorStore, state.selection, v)
+  }
 
   const setUnit = (unit: 'inch' | 'cm' | 'custom'): void => {
     const state = editorStore.getState()
@@ -124,9 +133,7 @@ export function TopBar() {
             max={sizeSpec.max}
             step={sizeSpec.step ?? 0.25}
             value={toolSize ?? sizeSpec.default}
-            onChange={(e) =>
-              editorStore.getState().setToolSize(activeToolId, parseFloat(e.target.value))
-            }
+            onChange={(e) => setSize(parseFloat(e.target.value))}
           />
           <input
             className="tool-size-num"
@@ -137,10 +144,23 @@ export function TopBar() {
             value={toolSize ?? sizeSpec.default}
             onChange={(e) => {
               const v = parseFloat(e.target.value)
-              if (!Number.isNaN(v)) editorStore.getState().setToolSize(activeToolId, v)
+              if (!Number.isNaN(v)) setSize(v)
             }}
           />
         </label>
+      )}
+
+      {activeToolId === 'paintbrush' && (
+        <select
+          className="grid-select"
+          value={brushPreset}
+          onChange={(e) => editorStore.getState().setBrushPreset(e.target.value as BrushPreset)}
+          title="Brush stroke shape"
+        >
+          <option value="taper">Taper</option>
+          <option value="uniform">Uniform</option>
+          <option value="calligraphic">Calligraphic</option>
+        </select>
       )}
 
       <div className="topbar-spacer" />
