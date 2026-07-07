@@ -52,7 +52,8 @@ abstract class SymbolismTool implements Tool {
       kind: this.kind,
       center: e.docPoint,
       radius,
-      strength: 0.3,
+      // Stain builds up per pass; a punchier rate makes a single stroke read.
+      strength: this.kind === 'stain' ? 0.6 : 0.3,
       delta,
       color: this.kind === 'stain' ? currentTint(ctx) : undefined,
       alt: e.modifiers.alt,
