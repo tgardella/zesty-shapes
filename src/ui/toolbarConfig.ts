@@ -23,7 +23,7 @@ export const TOOL_GROUPS: readonly (readonly string[])[] = [
   ['paintbrush', 'blob-brush'],
   ['rectangle', 'rounded-rect', 'ellipse', 'polygon', 'star', 'line'],
   ['type', 'type-vertical'],
-  ['scale', 'rotate'],
+  ['scale', 'rotate', 'reflect', 'shear'],
   ['eraser', 'scissors', 'knife'],
   ['width'],
   ['shape-builder'],

@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import {
   handleDocPosition,
+  reflectDocTransform,
   rotateDocTransform,
   scaleDocTransform,
+  shearDocTransform,
 } from './behaviors/TransformHandleBehavior'
 import { applyToPoint, decompose, invert, multiply } from '../geometry/matrix'
 import type { BBox } from '../geometry/bbox'
@@ -94,5 +96,84 @@ describe('rotateDocTransform', () => {
     expect(round[0]).toBeCloseTo(1)
     expect(round[4]).toBeCloseTo(0)
     expect(round[5]).toBeCloseTo(0)
+  })
+})
+
+describe('reflectDocTransform', () => {
+  it('reflects across a horizontal axis (point to the right of center)', () => {
+    // Axis angle 0 (pointer due right of center 50,50) → mirror across the
+    // horizontal line y=50: x is unchanged, y flips about 50.
+    const D = reflectDocTransform(box, { x: 150, y: 50 }, false)
+    expect(applyToPoint(D, { x: 30, y: 20 })).toMatchObject({ x: 30 })
+    const p = applyToPoint(D, { x: 30, y: 20 })
+    expect(p.x).toBeCloseTo(30)
+    expect(p.y).toBeCloseTo(80) // 20 reflected about y=50
+    // Points ON the axis are fixed.
+    const c = applyToPoint(D, { x: 10, y: 50 })
+    expect(c.x).toBeCloseTo(10)
+    expect(c.y).toBeCloseTo(50)
+  })
+
+  it('reflects across a vertical axis (point above center)', () => {
+    // Axis angle 90° (pointer straight up) → mirror across the vertical line
+    // x=50: y unchanged, x flips about 50.
+    const D = reflectDocTransform(box, { x: 50, y: 150 }, false)
+    const p = applyToPoint(D, { x: 20, y: 30 })
+    expect(p.x).toBeCloseTo(80)
+    expect(p.y).toBeCloseTo(30)
+  })
+
+  it('is a reflection (negative determinant) and an involution', () => {
+    const D = reflectDocTransform(box, { x: 130, y: 90 }, false)
+    const dec = decompose(D)
+    expect(dec.scaleX * dec.scaleY).toBeLessThan(0) // orientation reversed
+    // Applying it twice returns to the original.
+    const twice = multiply(D, D)
+    expect(applyToPoint(twice, { x: 33, y: 77 }).x).toBeCloseTo(33)
+    expect(applyToPoint(twice, { x: 33, y: 77 }).y).toBeCloseTo(77)
+  })
+
+  it('Shift snaps the axis to 45° steps', () => {
+    // Pointer at ~50° from center snaps the mirror axis to 45°.
+    const D = reflectDocTransform(
+      box,
+      { x: 50 + 100 * Math.cos(0.873), y: 50 + 100 * Math.sin(0.873) },
+      true,
+    )
+    // Reflection across a 45° axis swaps dx/dy about the center.
+    const p = applyToPoint(D, { x: 70, y: 50 }) // (+20, 0) from center
+    expect(p.x).toBeCloseTo(50)
+    expect(p.y).toBeCloseTo(70) // becomes (0, +20)
+  })
+})
+
+describe('shearDocTransform', () => {
+  it('horizontal drag shears along X about the center (center fixed)', () => {
+    // Drag +50 in x; halfH = 50 → k = 1. A point one half-height BELOW center
+    // (y=100) shifts +50 in x; the center row (y=50) is unchanged.
+    const D = shearDocTransform(box, { x: 50, y: 50 }, { x: 100, y: 50 }, { shift: false })
+    const c = applyToPoint(D, { x: 50, y: 50 })
+    expect(c.x).toBeCloseTo(50)
+    expect(c.y).toBeCloseTo(50)
+    const below = applyToPoint(D, { x: 50, y: 100 })
+    expect(below.x).toBeCloseTo(100) // +50 (k=1 · Δy=50)
+    expect(below.y).toBeCloseTo(100)
+  })
+
+  it('Shift shears along Y instead', () => {
+    // halfW = 50; drag +50 in y → k = 1. A point one half-width RIGHT of
+    // center (x=100) shifts +50 in y.
+    const D = shearDocTransform(box, { x: 50, y: 50 }, { x: 50, y: 100 }, { shift: true })
+    const right = applyToPoint(D, { x: 100, y: 50 })
+    expect(right.x).toBeCloseTo(100)
+    expect(right.y).toBeCloseTo(100)
+  })
+
+  it('produces a nonzero skew and preserves area (determinant 1)', () => {
+    const D = shearDocTransform(box, { x: 50, y: 50 }, { x: 90, y: 50 }, { shift: false })
+    const dec = decompose(D)
+    expect(Math.abs(dec.skew)).toBeGreaterThan(0)
+    // Pure shear preserves area.
+    expect(D[0] * D[3] - D[1] * D[2]).toBeCloseTo(1)
   })
 })

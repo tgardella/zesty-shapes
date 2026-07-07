@@ -109,6 +109,19 @@ const ICONS: Record<string, ReactNode> = {
       <path d="M10 1.5 L13 4.5 L10 7.5" fill="none" />
     </g>
   ),
+  reflect: (
+    <g fill="none" stroke="currentColor" strokeWidth="1.4">
+      <line x1="10" y1="2.5" x2="10" y2="17.5" strokeDasharray="2 1.6" />
+      <path d="M8 5 L3.5 10 L8 15 Z" />
+      <path d="M12 5 L16.5 10 L12 15 Z" fill="currentColor" stroke="none" opacity="0.5" />
+    </g>
+  ),
+  shear: (
+    <g fill="none" stroke="currentColor" strokeWidth="1.4">
+      <path d="M6.5 5 L16 5 L13.5 15 L4 15 Z" />
+      <line x1="3.5" y1="15" x2="9" y2="5" strokeDasharray="2 1.6" opacity="0.6" />
+    </g>
+  ),
   eyedropper: (
     <g fill="none" stroke="currentColor" strokeWidth="1.5">
       <path d="M4 16 L4.6 13.2 L11 6.8 L13.2 9 L6.8 15.4 Z" strokeLinejoin="round" />

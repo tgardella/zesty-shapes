@@ -14,7 +14,15 @@
  */
 
 import { useState } from 'react'
-import type { GradientPaint, Paint, RGBA, Style, StrokeCap, StrokeJoin } from '../model/types'
+import type {
+  DropShadow,
+  GradientPaint,
+  Paint,
+  RGBA,
+  Style,
+  StrokeCap,
+  StrokeJoin,
+} from '../model/types'
 import { cssColor } from '../model/defs'
 import { mixRGBA } from '../model/color'
 import { cloneStyle } from '../model/nodes'
@@ -217,6 +225,7 @@ export function AppearancePanel() {
       )}
 
       <StrokeOptions style={displayStyle} apply={apply} />
+      <DropShadowOptions style={displayStyle} apply={apply} dragStart={dragStart} dragEnd={dragEnd} />
       {selection.length > 0 && (
         <div className="stroke-row">
           <span className="row-label">Opacity</span>
@@ -376,6 +385,88 @@ function GradientEditor({
         onDragStart={dragStart('Gradient Stop Color')}
         onDragEnd={dragEnd}
       />
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Drop shadow (live SVG filter effect)
+// ---------------------------------------------------------------------------
+
+const DEFAULT_SHADOW: DropShadow = {
+  offsetX: 4,
+  offsetY: 4,
+  blur: 4,
+  color: { r: 0, g: 0, b: 0, a: 0.5 },
+}
+
+function DropShadowOptions({
+  style,
+  apply,
+  dragStart,
+  dragEnd,
+}: {
+  style: Style
+  apply(label: string, mutate: (style: Style) => void): void
+  dragStart(label: string): () => void
+  dragEnd(): void
+}) {
+  const shadow = style.dropShadow
+  const editShadow = (mutate: (sh: DropShadow) => void): void => {
+    apply('Drop Shadow', (s) => {
+      if (s.dropShadow) mutate(s.dropShadow)
+    })
+  }
+  return (
+    <div className="stroke-options">
+      <div className="stroke-row">
+        <span className="row-label">Drop Shadow</span>
+        <button
+          type="button"
+          className={`panel-btn seg-btn${shadow ? ' active' : ''}`}
+          onClick={() =>
+            apply(shadow ? 'Remove Drop Shadow' : 'Drop Shadow', (s) => {
+              if (s.dropShadow) delete s.dropShadow
+              else s.dropShadow = { ...DEFAULT_SHADOW, color: { ...DEFAULT_SHADOW.color } }
+            })
+          }
+        >
+          {shadow ? 'On' : 'Off'}
+        </button>
+      </div>
+      {shadow && (
+        <>
+          <div className="stroke-row">
+            <span className="row-label">Offset X</span>
+            <NumField
+              value={shadow.offsetX}
+              step={1}
+              onCommit={(v) => editShadow((sh) => (sh.offsetX = v))}
+            />
+            <span className="row-label">Y</span>
+            <NumField
+              value={shadow.offsetY}
+              step={1}
+              onCommit={(v) => editShadow((sh) => (sh.offsetY = v))}
+            />
+          </div>
+          <div className="stroke-row">
+            <span className="row-label">Blur</span>
+            <NumField
+              value={shadow.blur}
+              min={0}
+              step={0.5}
+              onCommit={(v) => editShadow((sh) => (sh.blur = v))}
+            />
+          </div>
+          <ColorPicker
+            color={shadow.color}
+            onChange={(c) => editShadow((sh) => (sh.color = c))}
+            onDragStart={dragStart('Drop Shadow Color')}
+            onDragEnd={dragEnd}
+          />
+        </>
+      )}
     </div>
   )
 }

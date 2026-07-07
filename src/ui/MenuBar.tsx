@@ -29,6 +29,14 @@ import {
   liveBlendIds,
 } from '../store/blendCommands'
 import { cmdConvertToMesh } from '../store/meshCommands'
+import {
+  canMakeClipMask,
+  canReleaseClipMask,
+  cmdMakeClipMask,
+  cmdReleaseClipMask,
+} from '../store/clipCommands'
+import { canSelectSame, selectSame } from '../store/selectSame'
+import { cmdOffsetPath, cmdOutlineStroke } from '../store/booleanCommands'
 import { cmdNewDocument } from '../store/layerCommands'
 import { editorStore, useEditor } from '../store/store'
 import { isSelectableDeep, selectionRoots } from '../tools/hitTest'
@@ -89,6 +97,9 @@ export function MenuBar({ manager }: { manager: ToolManager }) {
     }),
   )
   const hasLiveBlend = useEditor((s) => liveBlendIds(editorStore, s.selection).length > 0)
+  const canClip = useEditor((s) => canMakeClipMask(editorStore, s.selection))
+  const canReleaseClip = useEditor((s) => canReleaseClipMask(editorStore, s.selection))
+  const canSame = useEditor((s) => canSelectSame(editorStore, s.selection))
   // Replace Spine needs exactly one live blend + one other outline node selected.
   const spineReplaceable = useEditor((s) => {
     if (s.selection.length !== 2) return false
@@ -165,6 +176,27 @@ export function MenuBar({ manager }: { manager: ToolManager }) {
         },
         { sep: true, label: '' },
         { label: 'Select All', action: selectAll },
+        { sep: true, label: '' },
+        {
+          label: 'Select Same Fill Color',
+          disabled: !canSame,
+          action: () => selectSame(store, 'fill'),
+        },
+        {
+          label: 'Select Same Stroke Color',
+          disabled: !canSame,
+          action: () => selectSame(store, 'stroke'),
+        },
+        {
+          label: 'Select Same Stroke Weight',
+          disabled: !canSame,
+          action: () => selectSame(store, 'strokeWidth'),
+        },
+        {
+          label: 'Select Same Opacity',
+          disabled: !canSame,
+          action: () => selectSame(store, 'opacity'),
+        },
       ],
     },
     {
@@ -184,9 +216,37 @@ export function MenuBar({ manager }: { manager: ToolManager }) {
         },
         { sep: true, label: '' },
         {
+          label: 'Make Clipping Mask',
+          shortcut: '⌘7',
+          disabled: !canClip,
+          action: () => cmdMakeClipMask(store, store.getState().selection),
+        },
+        {
+          label: 'Release Clipping Mask',
+          shortcut: '⌥⌘7',
+          disabled: !canReleaseClip,
+          action: () => cmdReleaseClipMask(store, store.getState().selection),
+        },
+        { sep: true, label: '' },
+        {
           label: 'Convert to Path',
           disabled: !canConvert,
           action: () => cmdConvertToPath(store, store.getState().selection),
+        },
+        {
+          label: 'Offset Path…',
+          disabled: !hasSelection,
+          action: () => {
+            const input = window.prompt('Offset distance (px). Negative shrinks.', '10')
+            if (input === null) return
+            const d = parseFloat(input)
+            if (!Number.isNaN(d) && d !== 0) cmdOffsetPath(store, store.getState().selection, d)
+          },
+        },
+        {
+          label: 'Outline Stroke',
+          disabled: !hasSelection,
+          action: () => cmdOutlineStroke(store, store.getState().selection),
         },
         {
           label: 'Create Gradient Mesh',

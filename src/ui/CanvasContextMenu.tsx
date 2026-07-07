@@ -10,6 +10,13 @@ import { useEffect, useState } from 'react'
 import { copySelection, cutSelection, pasteClipboard } from '../store/clipboard'
 import { pasteFromSystemClipboard } from '../import/importFiles'
 import { cmdDeleteNodes, cmdDuplicateNodes } from '../store/commands'
+import {
+  canMakeClipMask,
+  canReleaseClipMask,
+  cmdMakeClipMask,
+  cmdReleaseClipMask,
+} from '../store/clipCommands'
+import { canSelectSame, selectSame } from '../store/selectSame'
 import { editorStore, useEditor } from '../store/store'
 
 interface MenuState {
@@ -44,6 +51,10 @@ export function CanvasContextMenu() {
     close()
   }
   const selection = () => editorStore.getState().selection
+  const sel = selection()
+  const sameEnabled = canSelectSame(editorStore, sel)
+  const clipEnabled = canMakeClipMask(editorStore, sel)
+  const releaseClipEnabled = canReleaseClipMask(editorStore, sel)
 
   // Keep the menu on-screen.
   const x = Math.min(menu.x, window.innerWidth - 180)
@@ -80,6 +91,34 @@ export function CanvasContextMenu() {
         >
           Delete
         </button>
+        <div className="menu-sep" />
+        <button
+          type="button"
+          disabled={!sameEnabled}
+          onClick={() => run(() => selectSame(editorStore, 'fill'))}
+        >
+          Select Same Fill
+        </button>
+        <button
+          type="button"
+          disabled={!sameEnabled}
+          onClick={() => run(() => selectSame(editorStore, 'stroke'))}
+        >
+          Select Same Stroke
+        </button>
+        {releaseClipEnabled ? (
+          <button type="button" onClick={() => run(() => cmdReleaseClipMask(editorStore, selection()))}>
+            Release Clipping Mask
+          </button>
+        ) : (
+          <button
+            type="button"
+            disabled={!clipEnabled}
+            onClick={() => run(() => cmdMakeClipMask(editorStore, selection()))}
+          >
+            Make Clipping Mask
+          </button>
+        )}
       </div>
     </>
   )

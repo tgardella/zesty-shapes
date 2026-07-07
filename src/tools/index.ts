@@ -30,8 +30,10 @@ import { PenTool } from './PenTool'
 import { PencilTool } from './PencilTool'
 import { PolygonTool } from './PolygonTool'
 import { RectangleTool, RoundedRectangleTool } from './RectangleTool'
+import { ReflectTool } from './ReflectTool'
 import { RotateTool } from './RotateTool'
 import { ScaleTool } from './ScaleTool'
+import { ShearTool } from './ShearTool'
 import { ScissorsTool } from './ScissorsTool'
 import { SelectionTool } from './SelectionTool'
 import { ShapeBuilderTool } from './ShapeBuilderTool'
@@ -57,6 +59,8 @@ export function createToolManager(store: EditorStoreApi): ToolManager {
   manager.register(new LineTool()) //              \
   manager.register(new ScaleTool()) //             S
   manager.register(new RotateTool()) //            R
+  manager.register(new ReflectTool()) //           O
+  manager.register(new ShearTool()) //             toolbar-selected
   manager.register(new ScissorsTool()) //          toolbar-selected
   manager.register(new EyedropperTool()) //        I
   manager.register(new GradientTool()) //          G
