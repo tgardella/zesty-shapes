@@ -5,7 +5,12 @@
 
 import type { EditorStoreApi } from '../store/store'
 import { ArtboardTool } from './ArtboardTool'
+import { BlendTool } from './BlendTool'
+import { BlobBrushTool } from './BlobBrushTool'
 import { CurvatureTool } from './CurvatureTool'
+import { GradientMeshTool } from './GradientMeshTool'
+import { PaintbrushTool } from './PaintbrushTool'
+import { SymbolSprayerTool } from './SymbolSprayerTool'
 import { DirectSelectionTool } from './DirectSelectionTool'
 import { EllipseTool } from './EllipseTool'
 import { EraserTool } from './EraserTool'
@@ -36,6 +41,8 @@ export function createToolManager(store: EditorStoreApi): ToolManager {
   manager.register(new PenTool()) //               P
   manager.register(new CurvatureTool()) //         toolbar-selected
   manager.register(new PencilTool()) //            N
+  manager.register(new PaintbrushTool()) //        B
+  manager.register(new BlobBrushTool()) //         Shift+B
   manager.register(new RectangleTool()) //         M
   manager.register(new RoundedRectangleTool()) //  toolbar-selected
   manager.register(new EllipseTool()) //           L
@@ -47,6 +54,9 @@ export function createToolManager(store: EditorStoreApi): ToolManager {
   manager.register(new ScissorsTool()) //          toolbar-selected
   manager.register(new EyedropperTool()) //        I
   manager.register(new GradientTool()) //          G
+  manager.register(new GradientMeshTool()) //      U
+  manager.register(new BlendTool()) //             W
+  manager.register(new SymbolSprayerTool()) //     Shift+S
   manager.register(new WidthTool()) //             Shift+W
   manager.register(new ShapeBuilderTool()) //      Shift+M
   manager.register(new KnifeTool()) //             toolbar-selected

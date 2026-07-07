@@ -22,6 +22,7 @@ import { isIdentity, toSvgTransform } from '../geometry/matrix'
 import { toSubPaths } from './nodes'
 import { layoutText } from './textLayout'
 import { hasWidthProfile } from './widthProfile'
+import { meshQuads, meshSeamWidth } from './mesh'
 import { outlineStroke } from './strokeOutline'
 import { regionsToSubPaths } from './booleanOps'
 import { localBBoxOfNode, transformBBox, unionBBox, type BBox } from '../geometry/bbox'
@@ -144,10 +145,39 @@ function nodeToSVG(doc: Document, id: NodeId, reg: DefsRegistry): string {
       `height="${node.h}" preserveAspectRatio="none" href="${escapeXml(node.href)}"/>`
     )
   }
+  if (node.type === 'mesh') return meshToSVG(node)
   if (hasWidthProfile(node.style)) return variableWidthToSVG(node, reg)
   const d = subpathsToPathData(toSubPaths(node))
   if (d === '') return ''
   return `<path id="${escapeXml(node.id)}" d="${d}"${commonAttrs(node)}${styleAttrs(node, reg)}/>`
+}
+
+/**
+ * Gradient mesh export mirrors MeshView: the SAME bilinear sub-quads
+ * (model/mesh.ts), clipped to the mesh outline. Self-contained — the clipPath
+ * lives inside the node's group, no defs registry involvement.
+ */
+function meshToSVG(node: Extract<SceneNode, { type: 'mesh' }>): string {
+  const quads = meshQuads(node)
+  const seam = meshSeamWidth(node)
+  const round = (v: number): number => Math.round(v * 1000) / 1000
+  let inner = ''
+  for (const q of quads) {
+    const c = q.color
+    const fill = `rgb(${Math.round(c.r)},${Math.round(c.g)},${Math.round(c.b)})`
+    const alpha = c.a < 1 ? ` fill-opacity="${c.a}" stroke-opacity="${c.a}"` : ''
+    inner +=
+      `<polygon points="${q.pts.map((p) => `${round(p.x)},${round(p.y)}`).join(' ')}"` +
+      ` fill="${fill}" stroke="${fill}" stroke-width="${round(seam)}"${alpha}/>`
+  }
+  const outlineD = node.outline ? subpathsToPathData(node.outline) : ''
+  if (outlineD !== '') {
+    const clipId = `mesh-clip-${escapeXml(node.id)}`
+    inner =
+      `<clipPath id="${clipId}"><path d="${outlineD}"/></clipPath>` +
+      `<g clip-path="url(#${clipId})">${inner}</g>`
+  }
+  return `<g id="${escapeXml(node.id)}"${commonAttrs(node)}>${inner}</g>`
 }
 
 /**

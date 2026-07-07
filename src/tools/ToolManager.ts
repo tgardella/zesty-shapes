@@ -27,6 +27,15 @@ import {
   cmdUpdateNode,
 } from '../store/commands'
 import { cmdErase, cmdKnife, cmdShapeBuilder } from '../store/booleanCommands'
+import { cmdBlend } from '../store/blendCommands'
+import { cmdBlobPaint } from '../store/brushCommands'
+import {
+  cmdConvertToMesh,
+  cmdMeshAddDivision,
+  cmdMeshMovePoint,
+  cmdMeshSetPointColor,
+} from '../store/meshCommands'
+import { cmdCreateSymbolSet, cmdSprayStamp } from '../store/sprayCommands'
 import {
   cmdAddArtboard,
   cmdDeleteArtboard,
@@ -311,6 +320,11 @@ export class ToolManager {
         knife: (trail, ids, width) => cmdKnife(store, trail, ids, width),
         erase: (trail, radius, ids) => cmdErase(store, trail, radius, ids),
         finishTextEdit: () => finishTextEdit(store),
+        blend: (aId, bId, steps) => cmdBlend(store, aId, bId, steps),
+        blobPaint: (trail, diameter, paint) => cmdBlobPaint(store, trail, diameter, paint),
+        createSymbolSet: () => cmdCreateSymbolSet(store),
+        sprayStamp: (sourceIds, stamp, groupId) => cmdSprayStamp(store, sourceIds, stamp, groupId),
+        convertToMesh: (id) => cmdConvertToMesh(store, id),
         editTextNode: (nodeId) => {
           const node = g().document.nodes[nodeId]
           if (!node || node.type !== 'text') return
@@ -323,6 +337,11 @@ export class ToolManager {
           state.setTextEdit({ nodeId })
         },
       },
+      mesh: {
+        addDivision: (id, localPoint, color) => cmdMeshAddDivision(store, id, localPoint, color),
+        movePoint: (id, index, localPoint) => cmdMeshMovePoint(store, id, index, localPoint),
+        setPointColor: (id, index, color) => cmdMeshSetPointColor(store, id, index, color),
+      },
       style: {
         target: () => g().ui.styleTarget,
         setTarget: (target) => g().setStyleTarget(target),
@@ -332,6 +351,10 @@ export class ToolManager {
       widthEdit: {
         get: () => g().ui.widthEdit,
         set: (id) => g().setWidthEdit(id),
+      },
+      meshEdit: {
+        get: () => g().ui.meshEdit,
+        set: (edit) => g().setMeshEdit(edit),
       },
       textEdit: {
         get: () => g().ui.textEdit,

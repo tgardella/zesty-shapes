@@ -77,6 +77,8 @@ export interface UiState {
   currentStyle: Style
   /** Node whose width profile the Width tool (Shift+W) is editing. */
   widthEdit: NodeId | null
+  /** Mesh point the Gradient Mesh tool (U) has selected (overlay highlight). */
+  meshEdit: { nodeId: NodeId; pointIndex: number } | null
   /** Shape Builder hover/gesture highlight: one region (DOC-space rings). */
   facePreview: Vec2[][] | null
   /** Knife/Eraser freehand trail (DOC space) while dragging. */
@@ -214,6 +216,7 @@ export interface EditorActions {
   setStyleTarget(target: StyleTarget): void
   setCurrentStyle(style: Style): void
   setWidthEdit(id: NodeId | null): void
+  setMeshEdit(edit: { nodeId: NodeId; pointIndex: number } | null): void
 
   /** Boolean-tool previews (Shape Builder face, Knife/Eraser trail); never undoable. */
   setFacePreview(region: Vec2[][] | null): void
@@ -277,6 +280,7 @@ export function createEditorStore(initialDocument?: Document): EditorStoreApi {
         styleTarget: 'fill',
         currentStyle: defaultStyle(),
         widthEdit: null,
+        meshEdit: null,
         facePreview: null,
         cutTrail: null,
         textEdit: null,
@@ -484,6 +488,11 @@ export function createEditorStore(initialDocument?: Document): EditorStoreApi {
       setWidthEdit(id) {
         const ui = get().ui
         if (ui.widthEdit !== id) set({ ui: { ...ui, widthEdit: id } })
+      },
+      setMeshEdit(edit) {
+        const ui = get().ui
+        if (ui.meshEdit === edit || (ui.meshEdit === null && edit === null)) return
+        set({ ui: { ...ui, meshEdit: edit } })
       },
       setFacePreview(region) {
         const ui = get().ui

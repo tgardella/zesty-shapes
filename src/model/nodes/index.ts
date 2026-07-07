@@ -20,6 +20,7 @@ import type {
   GroupNode,
   ImageNode,
   LineNode,
+  MeshNode,
   PathNode,
   PolygonNode,
   RectNode,
@@ -31,6 +32,7 @@ import type {
   SubPath,
   TextNode,
 } from '../types'
+import { meshBoundary } from '../mesh'
 
 export function rgba(r: number, g: number, b: number, a = 1): RGBA {
   return { r, g, b, a }
@@ -240,12 +242,15 @@ export function createImageNode(
  * Parametric shapes derive fresh subpaths from their params; PathNodes return
  * their stored subpaths as-is (same references — copy before mutating).
  * Images contribute their frame rectangle (selection outline / hit-testing /
- * type-on-path source).
+ * type-on-path source); meshes contribute their clip outline (or the grid
+ * boundary when the outline is absent).
  */
-export function toSubPaths(node: ShapeNode | PathNode | ImageNode): SubPath[] {
+export function toSubPaths(node: ShapeNode | PathNode | ImageNode | MeshNode): SubPath[] {
   switch (node.type) {
     case 'image':
       return rectToPath(0, 0, node.w, node.h, 0, 0)
+    case 'mesh':
+      return node.outline ?? meshBoundary(node)
     case 'rect':
       return rectToPath(node.x, node.y, node.w, node.h, node.rx, node.ry)
     case 'ellipse':

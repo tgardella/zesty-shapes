@@ -14,6 +14,7 @@ import { CanvasContextMenu } from './ui/CanvasContextMenu'
 import { PathfinderPanel } from './ui/PathfinderPanel'
 import { TextPanel } from './ui/TextPanel'
 import { LayersPanel } from './ui/LayersPanel'
+import { MenuBar } from './ui/MenuBar'
 import { Toolbar } from './ui/Toolbar'
 import { TopBar } from './ui/TopBar'
 
@@ -44,24 +45,27 @@ export function App() {
   }, [manager])
 
   return (
-    <div className="app">
-      <Toolbar manager={manager} />
-      <div className="main">
-        <TopBar />
-        <Viewport manager={manager} />
-      </div>
-      <div className="sidebar">
-        {/* Contextual panels (appear only when applicable) scroll in the space
-            above the Layers panel, which the user resizes to taste. */}
-        <div className="sidebar-panels">
-          <AppearancePanel />
-          <TextPanel />
-          <AlignPanel />
-          <PathfinderPanel />
+    <div className="app-shell">
+      <MenuBar manager={manager} />
+      <div className="app">
+        <Toolbar manager={manager} />
+        <div className="main">
+          <TopBar />
+          <Viewport manager={manager} />
         </div>
-        <LayersPanel />
+        <div className="sidebar">
+          {/* Contextual panels (appear only when applicable) scroll in the space
+              above the Layers panel, which the user resizes to taste. */}
+          <div className="sidebar-panels">
+            <AppearancePanel />
+            <TextPanel />
+            <AlignPanel />
+            <PathfinderPanel />
+          </div>
+          <LayersPanel />
+        </div>
+        <CanvasContextMenu />
       </div>
-      <CanvasContextMenu />
     </div>
   )
 }

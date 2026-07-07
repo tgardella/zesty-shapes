@@ -592,7 +592,8 @@ export function cmdConvertToPath(store: EditorStoreApi, ids: NodeId[]): NodeId[]
         node.type === 'group' ||
         node.type === 'text' ||
         node.type === 'path' ||
-        node.type === 'image'
+        node.type === 'image' ||
+        node.type === 'mesh'
       )
         continue
       // Snapshot to plain JSON first — convertToPath must not carry draft

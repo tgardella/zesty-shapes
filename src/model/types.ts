@@ -138,6 +138,7 @@ export type NodeType =
   | 'group'
   | 'text'
   | 'image'
+  | 'mesh'
 
 export interface BaseNode {
   id: NodeId
@@ -279,6 +280,33 @@ export interface ImageNode extends BaseNode {
   h: number
 }
 
+/** One gradient-mesh grid point: position + color, both in LOCAL space. */
+export interface MeshPoint {
+  p: Vec2
+  color: RGBA
+}
+
+/**
+ * Gradient mesh (Gradient Mesh tool, U): a (rows x cols) grid of colored
+ * points whose colors interpolate smoothly across the surface. Points are
+ * stored row-major — (rows+1)*(cols+1) entries, index r*(cols+1)+c. The
+ * original shape's outline (LOCAL space) clips the painted mesh, so a mesh
+ * made from an ellipse stays elliptical. Rendering/export approximate the
+ * smooth surface with bilinear-interpolated sub-quads (SVG has no native
+ * mesh gradient).
+ */
+export interface MeshNode extends BaseNode {
+  type: 'mesh'
+  /** Grid cells vertically (>= 1). */
+  rows: number
+  /** Grid cells horizontally (>= 1). */
+  cols: number
+  /** (rows+1)*(cols+1) points, row-major. */
+  points: MeshPoint[]
+  /** Clip outline in LOCAL space (the source shape); null = grid boundary. */
+  outline: SubPath[] | null
+}
+
 export type ShapeNode = RectNode | EllipseNode | PolygonNode | StarNode | LineNode
 
 export type SceneNode =
@@ -291,6 +319,7 @@ export type SceneNode =
   | GroupNode
   | TextNode
   | ImageNode
+  | MeshNode
 
 // ---------------------------------------------------------------------------
 // Document
