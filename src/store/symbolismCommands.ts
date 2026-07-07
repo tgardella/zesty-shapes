@@ -74,15 +74,23 @@ function stainSubtree(
   if (fill && fill.type === 'solid') fill.color = lerpColor(fill.color, color, amount)
 }
 
+/** Per-parent frame: doc->parent-local mapping + brush center/radius/delta there. */
+interface ParentFrame {
+  localCenter: Vec2
+  localRadius: number
+  localDelta: Vec2
+}
+
 /**
- * Apply one symbolism brush stamp to the instances of the given groups. An
- * instance (a direct child of the group) is affected when its center is within
- * the brush radius, weighted by a linear falloff to the edge. Returns true when
+ * Apply one symbolism brush stamp to the given INSTANCE nodes. Each instance is
+ * affected when its center is within the brush radius (linear falloff to the
+ * edge). An instance is transformed in its OWN parent's local space, so both
+ * sprayed symbol-set members and standalone shapes work. Returns true when
  * anything was in range.
  */
 export function cmdSymbolismAdjust(
   store: EditorStoreApi,
-  groupIds: NodeId[],
+  instanceIds: NodeId[],
   params: SymbolismParams,
 ): boolean {
   const doc = store.getState().document
@@ -93,49 +101,53 @@ export function cmdSymbolismAdjust(
     stain?: number
   }
   const jobs: Job[] = []
+  const frames = new Map<NodeId, ParentFrame | null>()
 
-  for (const groupId of groupIds) {
-    const group = doc.nodes[groupId]
-    if (!group || group.type !== 'group') continue
-    const world = getWorldTransform(doc.nodes, groupId)
+  const frameFor = (parentId: NodeId): ParentFrame | null => {
+    if (frames.has(parentId)) return frames.get(parentId)!
+    const world = getWorldTransform(doc.nodes, parentId)
     const inv = invert(world)
     const localCenter = applyToPoint(inv, params.center)
     const localRadius = params.radius / scaleOf(world)
-    if (localRadius <= 0) continue
-    // Pointer motion mapped into group-local space (Shifter).
     const localDelta = params.delta
       ? {
           x: applyToPoint(inv, { x: params.center.x + params.delta.x, y: params.center.y + params.delta.y }).x - localCenter.x,
           y: applyToPoint(inv, { x: params.center.x + params.delta.x, y: params.center.y + params.delta.y }).y - localCenter.y,
         }
       : { x: 0, y: 0 }
+    const frame = localRadius > 0 ? { localCenter, localRadius, localDelta } : null
+    frames.set(parentId, frame)
+    return frame
+  }
 
-    for (const childId of group.children) {
-      const child = doc.nodes[childId]
-      if (!child || child.locked) continue
-      const cc = childCenterLocal(child, doc.nodes)
-      if (!cc) continue
-      const dist = Math.hypot(cc.x - localCenter.x, cc.y - localCenter.y)
-      if (dist > localRadius) continue
-      const f = 1 - dist / localRadius
-      const w = params.strength * f
+  for (const id of instanceIds) {
+    const node = doc.nodes[id]
+    if (!node || node.locked || node.parent === null) continue
+    const frame = frameFor(node.parent)
+    if (!frame) continue
+    const { localCenter, localRadius, localDelta } = frame
+    const cc = childCenterLocal(node, doc.nodes)
+    if (!cc) continue
+    const dist = Math.hypot(cc.x - localCenter.x, cc.y - localCenter.y)
+    if (dist > localRadius) continue
+    const f = 1 - dist / localRadius
+    const w = params.strength * f
 
-      if (params.kind === 'shift') {
-        jobs.push({ id: childId, transform: multiply(translate(localDelta.x * f, localDelta.y * f), child.transform) })
-      } else if (params.kind === 'scrunch') {
-        // Pull toward (or Alt: push from) the brush center.
-        const dx = localCenter.x - cc.x
-        const dy = localCenter.y - cc.y
-        const len = Math.hypot(dx, dy) || 1
-        const step = w * localRadius * 0.25 * (params.alt ? -1 : 1)
-        jobs.push({ id: childId, transform: multiply(translate((dx / len) * step, (dy / len) * step), child.transform) })
-      } else if (params.kind === 'size') {
-        const k = params.alt ? 1 / (1 + w) : 1 + w
-        const m = multiply(translate(cc.x, cc.y), multiply(scaleMat(k), translate(-cc.x, -cc.y)))
-        jobs.push({ id: childId, transform: multiply(m, child.transform) })
-      } else if (params.kind === 'stain' && params.color) {
-        jobs.push({ id: childId, stain: Math.min(0.9, w) })
-      }
+    if (params.kind === 'shift') {
+      jobs.push({ id, transform: multiply(translate(localDelta.x * f, localDelta.y * f), node.transform) })
+    } else if (params.kind === 'scrunch') {
+      // Pull toward (or Alt: push from) the brush center.
+      const dx = localCenter.x - cc.x
+      const dy = localCenter.y - cc.y
+      const len = Math.hypot(dx, dy) || 1
+      const step = w * localRadius * 0.25 * (params.alt ? -1 : 1)
+      jobs.push({ id, transform: multiply(translate((dx / len) * step, (dy / len) * step), node.transform) })
+    } else if (params.kind === 'size') {
+      const k = params.alt ? 1 / (1 + w) : 1 + w
+      const m = multiply(translate(cc.x, cc.y), multiply(scaleMat(k), translate(-cc.x, -cc.y)))
+      jobs.push({ id, transform: multiply(m, node.transform) })
+    } else if (params.kind === 'stain' && params.color) {
+      jobs.push({ id, stain: Math.min(0.9, w) })
     }
   }
 

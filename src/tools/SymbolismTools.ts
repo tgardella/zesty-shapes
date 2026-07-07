@@ -33,16 +33,24 @@ abstract class SymbolismTool implements Tool {
   private targets: NodeId[] = []
   private lastPoint: Vec2 | null = null
 
-  /** Groups to affect: selected non-layer groups, else the group under the pointer. */
-  private resolveTargets(e: ToolPointerEvent, ctx: ToolContext): NodeId[] {
+  /**
+   * The instance nodes to affect: the current selection (a symbol set expands
+   * to its members; a plain shape acts as its own instance), or — with nothing
+   * selected — whatever is under the pointer. So the brush works on sprayed
+   * symbol sets AND on ordinary art.
+   */
+  private resolveInstances(e: ToolPointerEvent, ctx: ToolContext): NodeId[] {
     const doc = ctx.getDocument()
-    const isGroup = (id: NodeId): boolean => {
+    const expand = (id: NodeId): NodeId[] => {
       const n = doc.nodes[id]
-      return !!n && n.type === 'group' && !n.isLayer
+      if (!n) return []
+      if (n.type === 'group' && n.isLayer) return [] // don't stain a whole layer
+      if (n.type === 'group') return [...n.children]
+      return [id]
     }
-    const selected = ctx.getSelection().filter(isGroup)
-    if (selected.length > 0) return selected
-    if (e.hitNodeId && isGroup(e.hitNodeId)) return [e.hitNodeId]
+    const selected = ctx.getSelection().filter((id) => doc.nodes[id])
+    if (selected.length > 0) return selected.flatMap(expand)
+    if (e.hitNodeId) return expand(e.hitNodeId)
     return []
   }
 
@@ -61,7 +69,7 @@ abstract class SymbolismTool implements Tool {
   }
 
   onPointerDown(e: ToolPointerEvent, ctx: ToolContext): void {
-    this.targets = this.resolveTargets(e, ctx)
+    this.targets = this.resolveInstances(e, ctx)
     if (this.targets.length === 0) return
     ctx.transaction.begin('Symbolism')
     this.active = true

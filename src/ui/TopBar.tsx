@@ -7,7 +7,7 @@
 import { editorStore, useEditor } from '../store/store'
 import { cmdSetBlendSteps } from '../store/blendCommands'
 import { BUILTIN_BRUSHES } from '../model/brushLibrary'
-import { hexToRgb, rgbToHex } from '../model/color'
+import { rgbToHex } from '../model/color'
 import { TOOL_SIZE_SPECS } from '../tools/toolSizes'
 
 /** Grid spacing presets in doc units (CSS px): 96/inch, ~37.8/cm. */
@@ -169,19 +169,11 @@ export function TopBar() {
       )}
 
       {activeToolId === 'symbol-stainer' && (
-        <label className="tool-size" title="Stain color: the Symbol Stainer tints instances toward this (the current fill)">
-          Stain
-          <input
-            type="color"
-            value={currentFill && currentFill.type === 'solid' ? rgbToHex(currentFill.color) : '#e01e1e'}
-            onChange={(e) => {
-              const rgb = hexToRgb(e.target.value)
-              if (!rgb) return
-              const state = editorStore.getState()
-              state.setCurrentStyle({ ...state.ui.currentStyle, fill: { type: 'solid', color: rgb } })
-            }}
-          />
-        </label>
+        <span className="topbar-hint" title="The Symbol Stainer tints toward the Fill color in the Appearance panel">
+          Tints toward the Fill color{currentFill && currentFill.type === 'solid'
+            ? ` (${rgbToHex(currentFill.color)})`
+            : ''}
+        </span>
       )}
 
       <div className="topbar-spacer" />

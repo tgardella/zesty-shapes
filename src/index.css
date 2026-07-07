@@ -333,6 +333,12 @@ body {
   letter-spacing: 0.02em;
 }
 
+.topbar-hint {
+  font-size: 12px;
+  color: #8a8f9d;
+  white-space: nowrap;
+}
+
 .zoom-controls {
   display: flex;
   align-items: center;
