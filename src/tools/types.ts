@@ -181,6 +181,12 @@ export interface ToolContext {
     get(toolId: string): number
     set(toolId: string, size: number): void
   }
+
+  /**
+   * Grid snapping settings. Tools that snap OBJECT geometry (Selection move)
+   * read this to lock the object to the grid, rather than snapping the cursor.
+   */
+  gridSnap(): { enabled: boolean; size: number }
 }
 
 export interface Tool {
