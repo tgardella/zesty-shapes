@@ -20,7 +20,14 @@ import {
   cmdGroupNodes,
   cmdUngroupNodes,
 } from '../store/commands'
-import { cmdBlend, cmdExpandBlend, liveBlendIds } from '../store/blendCommands'
+import {
+  cmdBlend,
+  cmdExpandBlend,
+  cmdReleaseBlend,
+  cmdReplaceSpine,
+  cmdSetBlendSpine,
+  liveBlendIds,
+} from '../store/blendCommands'
 import { cmdConvertToMesh } from '../store/meshCommands'
 import { cmdNewDocument } from '../store/layerCommands'
 import { editorStore, useEditor } from '../store/store'
@@ -82,6 +89,15 @@ export function MenuBar({ manager }: { manager: ToolManager }) {
     }),
   )
   const hasLiveBlend = useEditor((s) => liveBlendIds(editorStore, s.selection).length > 0)
+  // Replace Spine needs exactly one live blend + one other outline node selected.
+  const spineReplaceable = useEditor((s) => {
+    if (s.selection.length !== 2) return false
+    const blends = liveBlendIds(editorStore, s.selection)
+    if (blends.length !== 1) return false
+    const other = s.selection.find((id) => id !== blends[0])
+    const n = other ? s.document.nodes[other] : undefined
+    return !!n && n.type !== 'group' && n.type !== 'text' && n.type !== 'image'
+  })
 
   useEffect(() => {
     if (open === null) return
@@ -191,6 +207,26 @@ export function MenuBar({ manager }: { manager: ToolManager }) {
           label: 'Expand Blend',
           disabled: !hasLiveBlend,
           action: () => cmdExpandBlend(store, store.getState().selection),
+        },
+        {
+          label: 'Release Blend',
+          disabled: !hasLiveBlend,
+          action: () => cmdReleaseBlend(store, store.getState().selection),
+        },
+        {
+          label: 'Replace Blend Spine',
+          disabled: !spineReplaceable,
+          action: () => {
+            const sel = store.getState().selection
+            const [blend] = liveBlendIds(store, sel)
+            const other = sel.find((id) => id !== blend)
+            if (blend && other) cmdReplaceSpine(store, blend, other)
+          },
+        },
+        {
+          label: 'Reset Blend Spine',
+          disabled: !hasLiveBlend,
+          action: () => cmdSetBlendSpine(store, store.getState().selection, null),
         },
       ],
     },

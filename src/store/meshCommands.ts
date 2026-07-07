@@ -6,7 +6,14 @@
 
 import type { Vec2 } from '../geometry/vec2'
 import type { NodeId, RGBA } from '../model/types'
-import { meshAddDivision, meshCellAt, meshFromShape } from '../model/mesh'
+import {
+  MESH_HANDLE_OPPOSITE,
+  meshAddDivision,
+  meshCellAt,
+  meshFromShape,
+  meshRowCol,
+  type MeshHandleDir,
+} from '../model/mesh'
 import type { EditorStoreApi } from './store'
 
 const MESHABLE = new Set(['rect', 'ellipse', 'polygon', 'star', 'path'])
@@ -79,7 +86,51 @@ export function cmdMeshMovePoint(
     const mesh = draft.nodes[id]
     if (mesh?.type !== 'mesh') return
     const point = mesh.points[index]
-    if (point) point.p = { x: localPoint.x, y: localPoint.y }
+    if (!point) return
+    // Any explicit tangent handles move rigidly with the point.
+    const dx = localPoint.x - point.p.x
+    const dy = localPoint.y - point.p.y
+    if (point.handles) {
+      for (const dir of ['left', 'right', 'up', 'down'] as MeshHandleDir[]) {
+        const h = point.handles[dir]
+        if (h) point.handles[dir] = { x: h.x + dx, y: h.y + dy }
+      }
+    }
+    point.p = { x: localPoint.x, y: localPoint.y }
+  })
+}
+
+/**
+ * Set one tangent handle of a mesh point (LOCAL space). `mirror` (default) keeps
+ * the opposite handle symmetric for a smooth point; false breaks it (Alt-drag).
+ * Call inside a drag transaction — a whole handle drag is ONE undo step.
+ */
+export function cmdMeshSetHandle(
+  store: EditorStoreApi,
+  id: NodeId,
+  index: number,
+  dir: MeshHandleDir,
+  localPoint: Vec2,
+  mirror: boolean,
+): void {
+  store.getState().applyCommand('Adjust Mesh Handle', (draft) => {
+    const mesh = draft.nodes[id]
+    if (mesh?.type !== 'mesh') return
+    const point = mesh.points[index]
+    if (!point) return
+    const handles = { ...(point.handles ?? {}) }
+    handles[dir] = { x: localPoint.x, y: localPoint.y }
+    if (mirror) {
+      const opp = MESH_HANDLE_OPPOSITE[dir]
+      const { r, c } = meshRowCol(mesh, index)
+      const valid =
+        (opp === 'left' && c > 0) ||
+        (opp === 'right' && c < mesh.cols) ||
+        (opp === 'up' && r > 0) ||
+        (opp === 'down' && r < mesh.rows)
+      if (valid) handles[opp] = { x: 2 * point.p.x - localPoint.x, y: 2 * point.p.y - localPoint.y }
+    }
+    point.handles = handles
   })
 }
 

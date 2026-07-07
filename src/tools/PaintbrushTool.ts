@@ -10,7 +10,7 @@
 import { translate } from '../geometry/matrix'
 import type { Vec2 } from '../geometry/vec2'
 import { distance, sub } from '../geometry/vec2'
-import type { NodeId, Paint, WidthStop } from '../model/types'
+import type { NodeId, Paint, RGBA, WidthStop } from '../model/types'
 import { createAnchor, createSubPath, fitPointsToSubPath } from '../model/pathOps'
 import { cloneStyle, createPathNode } from '../model/nodes'
 import type { BrushPreset } from '../store/store'
@@ -81,6 +81,12 @@ function brushPaint(ctx: ToolContext): Paint {
     : { type: 'solid', color: { r: 30, g: 30, b: 30, a: 1 } }
 }
 
+/** A solid RGBA for artwork brushes (dot fill / plain art stroke). */
+function brushColor(ctx: ToolContext): RGBA {
+  const paint = brushPaint(ctx)
+  return paint.type === 'solid' ? { ...paint.color } : { r: 30, g: 30, b: 30, a: 1 }
+}
+
 export class PaintbrushTool implements Tool {
   readonly id = 'paintbrush'
   readonly name = 'Paintbrush'
@@ -134,14 +140,34 @@ export class PaintbrushTool implements Tool {
         ctx.transaction.cancel()
         return
       }
+      const brush = ctx.brush.activeDef()
+      const width = ctx.toolSize.get('paintbrush')
+
+      // Artwork brushes (scatter/pattern/art) drop the preview stroke and place
+      // copies of the active symbol along the trail instead — same undo step.
+      if (brush.kind !== 'stroke') {
+        const polyline = this.samples.map((p) => ({ x: p.x + this.origin.x, y: p.y + this.origin.y }))
+        ctx.commands.deleteNodes([id])
+        const groupId = ctx.commands.brushArtwork({
+          brush,
+          polyline,
+          size: width,
+          color: brushColor(ctx),
+          symbolId: ctx.symbols.activeId(),
+        })
+        if (groupId) ctx.select.set([groupId])
+        else ctx.transaction.cancel()
+        this.samples = []
+        return
+      }
+
       const tolerance = FIT_TOLERANCE_PX / ctx.getViewport().zoom
       const fitted = fitPointsToSubPath(this.samples, tolerance)
       if (!fitted) {
         ctx.transaction.cancel()
         return
       }
-      const width = ctx.toolSize.get('paintbrush')
-      const profile = brushWidthProfile(ctx.brush.preset(), width, this.samples)
+      const profile = brushWidthProfile(brush.profile ?? 'uniform', width, this.samples)
       ctx.commands.updateNode(id, 'Paintbrush', (node) => {
         if (node.type !== 'path') return
         node.subpaths = [fitted]

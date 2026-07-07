@@ -11,6 +11,12 @@ import { CurvatureTool } from './CurvatureTool'
 import { GradientMeshTool } from './GradientMeshTool'
 import { PaintbrushTool } from './PaintbrushTool'
 import { SymbolSprayerTool } from './SymbolSprayerTool'
+import {
+  SymbolShifterTool,
+  SymbolSizerTool,
+  SymbolScruncherTool,
+  SymbolStainerTool,
+} from './SymbolismTools'
 import { DirectSelectionTool } from './DirectSelectionTool'
 import { EllipseTool } from './EllipseTool'
 import { EraserTool } from './EraserTool'
@@ -57,6 +63,10 @@ export function createToolManager(store: EditorStoreApi): ToolManager {
   manager.register(new GradientMeshTool()) //      U
   manager.register(new BlendTool()) //             W
   manager.register(new SymbolSprayerTool()) //     Shift+S
+  manager.register(new SymbolShifterTool()) //     toolbar-selected
+  manager.register(new SymbolScruncherTool()) //   toolbar-selected
+  manager.register(new SymbolSizerTool()) //       toolbar-selected
+  manager.register(new SymbolStainerTool()) //     toolbar-selected
   manager.register(new WidthTool()) //             Shift+W
   manager.register(new ShapeBuilderTool()) //      Shift+M
   manager.register(new KnifeTool()) //             toolbar-selected

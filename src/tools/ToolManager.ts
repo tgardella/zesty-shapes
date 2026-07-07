@@ -27,16 +27,20 @@ import {
   cmdUpdateNode,
 } from '../store/commands'
 import { cmdErase, cmdKnife, cmdShapeBuilder } from '../store/booleanCommands'
-import { cmdBlend } from '../store/blendCommands'
+import { cmdBlend, cmdSetBlendSpine } from '../store/blendCommands'
 import { cmdBlobPaint } from '../store/brushCommands'
+import { cmdBrushArtwork } from '../store/brushArtworkCommands'
+import { brushById } from '../model/brushLibrary'
 import {
   cmdConvertToMesh,
   cmdMeshAddDivision,
   cmdMeshMovePoint,
+  cmdMeshSetHandle,
   cmdMeshSetPointColor,
 } from '../store/meshCommands'
 import { cmdCreateSymbolSet, cmdSprayStamp } from '../store/sprayCommands'
 import { cmdStampSymbol } from '../store/symbolCommands'
+import { cmdSymbolismAdjust } from '../store/symbolismCommands'
 import {
   cmdAddArtboard,
   cmdDeleteArtboard,
@@ -322,11 +326,14 @@ export class ToolManager {
         erase: (trail, radius, ids) => cmdErase(store, trail, radius, ids),
         finishTextEdit: () => finishTextEdit(store),
         blend: (aId, bId, steps) => cmdBlend(store, aId, bId, steps),
+        setBlendSpine: (ids, controls) => cmdSetBlendSpine(store, ids, controls),
         blobPaint: (trail, diameter, paint) => cmdBlobPaint(store, trail, diameter, paint),
         createSymbolSet: () => cmdCreateSymbolSet(store),
         sprayStamp: (sourceIds, stamp, groupId) => cmdSprayStamp(store, sourceIds, stamp, groupId),
         stampSymbol: (symbolId, stamp, parentId) => cmdStampSymbol(store, symbolId, stamp, parentId),
+        symbolismAdjust: (groupIds, params) => cmdSymbolismAdjust(store, groupIds, params),
         convertToMesh: (id) => cmdConvertToMesh(store, id),
+        brushArtwork: (params) => cmdBrushArtwork(store, params),
         editTextNode: (nodeId) => {
           const node = g().document.nodes[nodeId]
           if (!node || node.type !== 'text') return
@@ -343,6 +350,8 @@ export class ToolManager {
         addDivision: (id, localPoint, color) => cmdMeshAddDivision(store, id, localPoint, color),
         movePoint: (id, index, localPoint) => cmdMeshMovePoint(store, id, index, localPoint),
         setPointColor: (id, index, color) => cmdMeshSetPointColor(store, id, index, color),
+        setHandle: (id, index, dir, localPoint, mirror) =>
+          cmdMeshSetHandle(store, id, index, dir, localPoint, mirror),
       },
       style: {
         target: () => g().ui.styleTarget,
@@ -362,7 +371,7 @@ export class ToolManager {
         activeId: () => g().ui.activeSymbolId,
       },
       brush: {
-        preset: () => g().ui.brushPreset,
+        activeDef: () => brushById(g().ui.activeBrushId),
       },
       textEdit: {
         get: () => g().ui.textEdit,

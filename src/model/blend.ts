@@ -14,7 +14,7 @@
 import type { Vec2 } from '../geometry/vec2'
 import type { Ring, Regions } from '../geometry/boolean'
 import type { NodeId, Paint, SceneNode, Style } from './types'
-import { lerpColor } from './mesh'
+import { crVec, lerpColor } from './mesh'
 import { cloneStyle } from './nodes'
 import { nodeRegionsInDoc } from './booleanOps'
 import { getWorldTransform } from './document'
@@ -170,6 +170,64 @@ export function interpolateStyle(a: Style, b: Style, t: number): Style {
 }
 
 // ---------------------------------------------------------------------------
+// Spine: the path the interpolated steps follow
+// ---------------------------------------------------------------------------
+
+/** Catmull-Rom polyline through the spine control points (>= 2), local space. */
+export function spinePolyline(controls: Vec2[], per = 24): Vec2[] {
+  if (controls.length <= 1) return controls.map((p) => ({ ...p }))
+  if (controls.length === 2) return [{ ...controls[0]! }, { ...controls[1]! }]
+  const at = (i: number): Vec2 => controls[Math.max(0, Math.min(controls.length - 1, i))]!
+  const out: Vec2[] = [{ ...controls[0]! }]
+  for (let i = 0; i < controls.length - 1; i++) {
+    for (let k = 1; k <= per; k++) out.push(crVec(at(i - 1), at(i), at(i + 1), at(i + 2), k / per))
+  }
+  return out
+}
+
+interface SpinePath {
+  poly: Vec2[]
+  /** Cumulative arc length at each polyline vertex. */
+  cum: number[]
+  total: number
+}
+
+function buildSpine(controls: Vec2[]): SpinePath {
+  const poly = spinePolyline(controls)
+  const cum: number[] = [0]
+  for (let i = 1; i < poly.length; i++) {
+    cum.push(cum[i - 1]! + Math.hypot(poly[i]!.x - poly[i - 1]!.x, poly[i]!.y - poly[i - 1]!.y))
+  }
+  return { poly, cum, total: cum[cum.length - 1] ?? 0 }
+}
+
+export interface SpineSample {
+  pos: Vec2
+  /** Tangent direction (radians). */
+  angle: number
+}
+
+/** Position + tangent at arc-length fraction `u` (0-1) along the spine. */
+function sampleSpine(spine: SpinePath, u: number): SpineSample {
+  const { poly, cum, total } = spine
+  if (poly.length < 2 || total === 0) {
+    const p = poly[0] ?? { x: 0, y: 0 }
+    return { pos: { ...p }, angle: 0 }
+  }
+  const target = Math.max(0, Math.min(1, u)) * total
+  let i = 1
+  while (i < poly.length - 1 && cum[i]! < target) i++
+  const a = poly[i - 1]!
+  const b = poly[i]!
+  const seg = cum[i]! - cum[i - 1]!
+  const t = seg === 0 ? 0 : (target - cum[i - 1]!) / seg
+  return {
+    pos: { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t },
+    angle: Math.atan2(b.y - a.y, b.x - a.x),
+  }
+}
+
+// ---------------------------------------------------------------------------
 // LIVE blend: derived step geometry for a blend group
 // ---------------------------------------------------------------------------
 
@@ -177,6 +235,21 @@ interface BlendOperand {
   regions: Regions
   first: Style
   last: Style
+}
+
+/** Union centroid of every ring in the regions (doc space). */
+function regionsCentroid(regions: Regions): Vec2 {
+  let x = 0
+  let y = 0
+  let n = 0
+  for (const ring of regions.flat()) {
+    for (const p of ring) {
+      x += p.x
+      y += p.y
+      n++
+    }
+  }
+  return n === 0 ? { x: 0, y: 0 } : { x: x / n, y: y / n }
 }
 
 /** DOC-space fill regions + first/last leaf styles of a blend endpoint subtree. */
@@ -228,14 +301,64 @@ export function blendStepGeometry(
   if (pairs.length === 0) return []
 
   const toLocal = invert(getWorldTransform(nodes, groupId))
+  // The default straight spine runs between the two endpoint centroids
+  // (LOCAL space); the lerped step centroid at t is exactly that line, so with
+  // no explicit spine the offset below is a no-op.
+  const aCenter = applyToPoint(toLocal, regionsCentroid(a.regions))
+  const bCenter = applyToPoint(toLocal, regionsCentroid(b.regions))
+  const controls = group.blend.spine ?? [aCenter, bCenter]
+  const spine = buildSpine(controls)
+  const baseAngle = Math.atan2(
+    controls[controls.length - 1]!.y - controls[0]!.y,
+    controls[controls.length - 1]!.x - controls[0]!.x,
+  )
+  const align = group.blend.spineAlign !== false
+
   const n = Math.max(1, Math.round(group.blend.steps))
   const steps: BlendStep[] = []
   for (let i = 1; i <= n; i++) {
     const t = i / (n + 1)
+    // Default step position (straight spine) is the lerp of the centroids.
+    const base = { x: aCenter.x + (bCenter.x - aCenter.x) * t, y: aCenter.y + (bCenter.y - aCenter.y) * t }
+    const sample = sampleSpine(spine, t)
+    const da = align ? sample.angle - baseAngle : 0
+    const cos = Math.cos(da)
+    const sin = Math.sin(da)
+    // Rigid transform: rotate each ring about its base centroid by `da`, then
+    // translate the centroid from `base` to the spine sample position.
+    const place = (p: Vec2): Vec2 => {
+      const dx = p.x - base.x
+      const dy = p.y - base.y
+      return { x: sample.pos.x + dx * cos - dy * sin, y: sample.pos.y + dx * sin + dy * cos }
+    }
     const regions: Regions = pairs.map((pair) => [
-      lerpRing(pair.a, pair.b, t).map((p) => applyToPoint(toLocal, p)),
+      lerpRing(pair.a, pair.b, t).map((p) => place(applyToPoint(toLocal, p))),
     ])
     steps.push({ regions, style: interpolateStyle(a.first, b.last, t) })
   }
   return steps
+}
+
+/**
+ * The effective spine control points of a live blend in its GROUP-LOCAL space:
+ * the explicit `blend.spine` if set, else the straight line between the two
+ * endpoint centroids. Null when the group isn't a valid live blend. Used by
+ * the Blend tool + overlay for interactive spine editing.
+ */
+export function blendSpineControls(
+  nodes: Record<NodeId, SceneNode>,
+  groupId: NodeId,
+): Vec2[] | null {
+  const group = nodes[groupId]
+  if (!group || group.type !== 'group' || !group.blend || group.children.length !== 2) return null
+  const explicit = group.blend.spine
+  if (explicit && explicit.length >= 2) return explicit.map((p) => ({ ...p }))
+  const a = collectEndpoint(nodes, group.children[0]!)
+  const b = collectEndpoint(nodes, group.children[1]!)
+  if (!a || !b) return null
+  const toLocal = invert(getWorldTransform(nodes, groupId))
+  return [
+    applyToPoint(toLocal, regionsCentroid(a.regions)),
+    applyToPoint(toLocal, regionsCentroid(b.regions)),
+  ]
 }
