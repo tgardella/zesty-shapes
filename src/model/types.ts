@@ -215,8 +215,18 @@ export interface GroupNode extends BaseNode {
   type: 'group'
   /** z-order: earlier = painted first (bottom). */
   children: NodeId[]
-  /** True for top-level layer groups (Layers panel treats these specially). */
+  /** True for LAYER groups (top-level layers and nested sublayers). */
   isLayer?: boolean
+  /**
+   * Layer-only fields (meaningful when isLayer). The Layers panel edits these
+   * through the Layer Options dialog.
+   */
+  /** Highlight color (hex) for selection outlines/anchors of art on this layer. */
+  layerColor?: string
+  /** Template layer: auto-locked + dimmed, excluded from export (tracing aid). */
+  template?: boolean
+  /** Dim placed images on this layer to N% opacity (1-100); absent = 100%. */
+  dimImages?: number
 }
 
 /**

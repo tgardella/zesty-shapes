@@ -29,6 +29,10 @@ export function PathfinderPanel() {
     return !!node && node.type !== 'text' && (node.type === 'group' || node.style.stroke !== null)
   })
 
+  // Contextual: the Pathfinder's boolean ops need ≥2 shapes. (Outline-stroke
+  // on a single shape stays available from the toolbar.)
+  if (!enough) return null
+
   return (
     <div className="panel">
       <div className="panel-title">Pathfinder</div>

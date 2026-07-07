@@ -12,7 +12,7 @@ import { multiply, translate } from '../geometry/matrix'
 import type { Mat } from '../geometry/matrix'
 import { createGroupNode } from '../model/nodes'
 import type { GroupNode, NodeId, SceneNode } from '../model/types'
-import type { EditorStoreApi } from './store'
+import { resolveInsertionParent, type EditorStoreApi } from './store'
 
 /** World bounds of the forest before insertion (its own space = doc space). */
 function forestBounds(nodes: SceneNode[], roots: string[]): BBox | null {
@@ -47,6 +47,9 @@ export function cmdInsertImportedNodes(
 ): NodeId[] {
   if (roots.length === 0) return []
   const label = opts.label ?? 'Import'
+  // Imported art joins the active layer (Illustrator: placed images become
+  // OBJECTS on a layer, not their own top-level layers).
+  const targetParentId = resolveInsertionParent(store.getState())
 
   // Optional recentering delta, applied to the ROOT transforms only.
   let delta: Mat | null = null
@@ -68,27 +71,30 @@ export function cmdInsertImportedNodes(
   store.getState().applyCommand(
     label,
     (doc) => {
-      const rootGroup = doc.nodes[doc.root] as GroupNode
+      const parent =
+        doc.nodes[targetParentId]?.type === 'group'
+          ? (doc.nodes[targetParentId] as GroupNode)
+          : (doc.nodes[doc.root] as GroupNode)
       for (const node of nodes) {
         doc.nodes[node.id] = node
       }
       if (wrapper) {
         if (delta) wrapper.transform = multiply(delta, wrapper.transform)
         wrapper.children = [...roots]
-        wrapper.parent = doc.root
+        wrapper.parent = parent.id
         doc.nodes[wrapper.id] = wrapper
         for (const id of roots) {
           const n = doc.nodes[id]
           if (n) n.parent = wrapper.id
         }
-        rootGroup.children.push(wrapper.id)
+        parent.children.push(wrapper.id)
       } else {
         for (const id of roots) {
           const n = doc.nodes[id]
           if (!n) continue
           if (delta) n.transform = multiply(delta, n.transform)
-          n.parent = doc.root
-          rootGroup.children.push(id)
+          n.parent = parent.id
+          parent.children.push(id)
         }
       }
     },
